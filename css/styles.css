@@ -4441,3 +4441,61 @@ td:last-child {
         right: -2rem;
     }
 }
+/* Floating WhatsApp Button
+----------------------------------------------- */
+.whatsapp-float {
+    position: fixed;
+    bottom: 2.4rem;
+    right: 2.4rem;
+    z-index: 9999;
+    background-color: #25D366;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 16px rgba(37, 211, 102, 0.45);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    text-decoration: none;
+}
+
+.whatsapp-float:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 22px rgba(37, 211, 102, 0.6);
+}
+
+@media screen and (max-width: 600px) {
+    .whatsapp-float {
+        bottom: 1.6rem;
+        right: 1.6rem;
+        width: 50px;
+        height: 50px;
+    }
+}
+
+/* My Resume button — premium white on mobile
+----------------------------------------------- */
+@media screen and (max-width: 1080px) {
+    .s-intro__btn-download .btn--stroke {
+        background   : white !important;
+        border       : 2px solid white !important;
+        color        : #111 !important;
+        border-radius: 4px;
+        font-weight  : 600;
+        letter-spacing: 0.08em;
+    }
+
+    .s-intro__btn-download .btn--stroke:hover {
+        background: transparent !important;
+        color     : white !important;
+    }
+
+    .s-intro__btn-download .btn--stroke::before {
+        display: none;
+    }
+
+    .s-intro__btn-download .btn--stroke::after {
+        display: none;
+    }
+}
