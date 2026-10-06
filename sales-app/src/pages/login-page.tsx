@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { LoaderIcon, LockIcon, UserIcon } from 'lucide-react'
+import { EyeIcon, EyeOffIcon, LoaderIcon, LockIcon, UserIcon } from 'lucide-react'
 import { BrundavanLogo } from '@/components/brand'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,6 +13,7 @@ export function LoginPage() {
   const [password, setPassword] = React.useState('')
   const [error, setError] = React.useState<string | null>(null)
   const [busy, setBusy] = React.useState(false)
+  const [showPassword, setShowPassword] = React.useState(false)
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
@@ -62,17 +63,37 @@ export function LoginPage() {
               <LockIcon className="size-4 text-muted-foreground" aria-hidden />
               Password
             </Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              enterKeyHint="go"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              aria-invalid={error ? true : undefined}
-              required
-            />
+            <div className="relative">
+              <Input
+                id="password"
+                name="password"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                enterKeyHint="go"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                aria-invalid={error ? true : undefined}
+                className="pr-12"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-pressed={showPassword}
+                aria-controls="password"
+                className="absolute inset-y-0 right-0 flex w-12 items-center justify-center rounded-r-lg text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              >
+                {showPassword ? (
+                  <EyeOffIcon className="size-5" aria-hidden />
+                ) : (
+                  <EyeIcon className="size-5" aria-hidden />
+                )}
+              </button>
+            </div>
           </div>
 
           {error && (
