@@ -2,13 +2,21 @@ import { Link } from 'react-router-dom'
 import { Card } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
-import { formatCurrency, formatPercent } from '@/lib/format'
+import { TrendingDownIcon, TrendingUpIcon } from 'lucide-react'
+import { formatCurrency, formatPercent, formatSignedPercent } from '@/lib/format'
 import type { MonthlyMetrics } from '@/types'
+import type { MonthComparison } from '@/calculations/comparison'
 
 /**
  * The one card that answers "how are we doing this month?" without scrolling.
  */
-export function MonthSummaryCard({ monthly }: { monthly: MonthlyMetrics }) {
+export function MonthSummaryCard({
+  monthly,
+  comparison,
+}: {
+  monthly: MonthlyMetrics
+  comparison?: MonthComparison | null
+}) {
   const hasTarget = monthly.monthlyTarget > 0
   const pct = monthly.achievement ?? 0
 
@@ -21,6 +29,27 @@ export function MonthSummaryCard({ monthly }: { monthly: MonthlyMetrics }) {
         <p className="tnum mt-1 text-[2.6rem] leading-none font-extrabold tracking-tight text-foreground">
           {formatCurrency(monthly.mtdSales)}
         </p>
+
+        {comparison && comparison.changePercent !== null && (
+          <p className="mt-1.5 flex items-center gap-1.5 text-sm">
+            {comparison.change >= 0 ? (
+              <TrendingUpIcon className="size-4 shrink-0 text-leaf-600" aria-hidden />
+            ) : (
+              <TrendingDownIcon className="size-4 shrink-0 text-brand-600" aria-hidden />
+            )}
+            <span
+              className={
+                comparison.change >= 0 ? 'tnum font-bold text-leaf-600' : 'tnum font-bold text-brand-600'
+              }
+            >
+              {formatSignedPercent(comparison.changePercent)}
+            </span>
+            <span className="min-w-0 truncate text-muted-foreground">
+              vs {comparison.trimmed ? `first ${comparison.daysCompared} days of ` : ''}
+              {comparison.previousLabel}
+            </span>
+          </p>
+        )}
 
         {hasTarget ? (
           <>

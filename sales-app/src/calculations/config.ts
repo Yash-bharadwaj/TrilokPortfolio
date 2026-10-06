@@ -4,27 +4,57 @@
  * The handwritten sheet lists `Net Sale | Swiggy | Zomato | Total Sale`, which
  * on its own does not say whether Total = Net, or Total = Net + Swiggy + Zomato.
  *
- * The brief's own figures settle it. The five seed days of net sales
- *   38,456 + 53,685 + 55,810 + 41,866 + 51,831 = 2,41,648
- * reproduce the quoted month-to-date total of ₹2,41,648 exactly, and the quoted
- * channel split (Direct 1,81,348 + Swiggy 32,500 + Zomato 27,800) sums to the
- * same ₹2,41,648. Both only hold if NET SALES ALREADY CONTAINS the aggregator
- * sales, and Direct is the remainder.
+ * The written brief's sample figures pointed one way: its five seed days of net
+ * sales sum to the month-to-date total it quotes (2,41,648), and its channel
+ * split sums to the same number — both of which only hold if Net already
+ * contained the aggregators.
  *
- * So: total = net, and direct = net − swiggy − zomato.
+ * The hotel says otherwise, and the hotel decides: Net Sales is restaurant
+ * trade (dine-in and takeaway), entered on its own, with Swiggy and Zomato
+ * entered separately and added on top. So:
  *
- * If the hotel ever confirms the opposite, flip SALES_MODEL to
- * 'net-excludes-online'. Nothing outside this file needs to change.
+ *     total  = net + swiggy + zomato
+ *     direct = net
+ *
+ * Worth knowing: under this rule the brief's own "Total Sale" column and its
+ * quoted MTD figure do not reconcile, so that column likely meant something
+ * else. Nothing here depends on it.
+ *
+ * If this ever changes again, flip SALES_MODEL. Nothing outside this file
+ * needs to change.
  */
 export type SalesModel = 'net-includes-online' | 'net-excludes-online'
 
-export const SALES_MODEL: SalesModel = 'net-includes-online'
+export const SALES_MODEL: SalesModel = 'net-excludes-online'
 
-/** Human-readable note shown in Settings so the rule is never a hidden assumption. */
-export const SALES_MODEL_NOTE =
-  SALES_MODEL === 'net-includes-online'
-    ? 'Net Sales is the full day total. Swiggy and Zomato are shown as a split of it, and Direct is the remainder.'
-    : 'Net Sales covers counter sales only. Swiggy and Zomato are added on top to form the day total.'
+/**
+ * Wording that follows the model. A lookup rather than comparisons, because at
+ * module scope TypeScript narrows the constant to its own literal.
+ */
+const MODEL_TEXT = {
+  'net-includes-online': {
+    note: 'Net Sales is the full day total. Swiggy and Zomato are shown as a split of it, and Direct is the remainder.',
+    direct: 'Direct',
+    net: 'Total sales for the day',
+    netHint: 'Including Swiggy and Zomato orders.',
+  },
+  'net-excludes-online': {
+    note: 'Restaurant sales (dine-in and takeaway) are entered on their own. Swiggy and Zomato are added on top to give the day total.',
+    direct: 'Restaurant',
+    net: 'Restaurant sales',
+    netHint: 'Dine-in and takeaway only. Add Swiggy and Zomato below.',
+  },
+} as const satisfies Record<SalesModel, { note: string; direct: string; net: string; netHint: string }>
+
+/** Shown in Settings so the rule is never a hidden assumption. */
+export const SALES_MODEL_NOTE: string = MODEL_TEXT[SALES_MODEL].note
+
+/** What the restaurant's own (non-aggregator) sales are called in the UI. */
+export const DIRECT_LABEL: string = MODEL_TEXT[SALES_MODEL].direct
+
+/** Label and hint for the required amount on the entry form. */
+export const NET_LABEL: string = MODEL_TEXT[SALES_MODEL].net
+export const NET_HINT: string = MODEL_TEXT[SALES_MODEL].netHint
 
 /** Day total credited against the target. */
 export function totalSalesOf(entry: {

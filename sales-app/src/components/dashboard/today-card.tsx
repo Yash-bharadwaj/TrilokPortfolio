@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Stat } from './stat'
 import { formatCurrency, formatSignedCurrency } from '@/lib/format'
 import { formatLongDate, todayKey } from '@/lib/date'
+import { DIRECT_LABEL } from '@/calculations/config'
 import type { DailyMetrics } from '@/types'
 
 /** The day in focus: what came in, and whether it beat its share of the target. */
@@ -64,7 +65,7 @@ export function TodayCard({ daily, hasTarget }: { daily: DailyMetrics; hasTarget
       <div className="mt-4 grid grid-cols-3 gap-3 border-t border-border pt-4">
         <Stat label="Swiggy" value={formatCurrency(daily.channels.swiggy)} />
         <Stat label="Zomato" value={formatCurrency(daily.channels.zomato)} />
-        <Stat label="Direct" value={formatCurrency(daily.channels.direct)} />
+        <Stat label={DIRECT_LABEL} value={formatCurrency(daily.channels.direct)} />
         {daily.food.recorded && (
           <>
             <Stat label="Veg" value={formatCurrency(daily.food.veg)} />

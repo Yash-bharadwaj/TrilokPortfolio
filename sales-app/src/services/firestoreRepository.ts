@@ -2,6 +2,8 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
+  getDocs,
   onSnapshot,
   serverTimestamp,
   setDoc,
@@ -90,6 +92,26 @@ export function createFirestoreRepository(userId: string): SalesRepository {
       return () => {
         unsubSales()
         unsubSettings()
+      }
+    },
+
+    async getMonthSnapshot(monthKey) {
+      const [salesSnap, monthSnap] = await Promise.all([
+        getDocs(salesCollection(monthKey)),
+        getDoc(monthDoc(monthKey)),
+      ])
+      const data = monthSnap.data()
+      return {
+        monthKey,
+        entries: sortEntries(salesSnap.docs.map((d) => toDailySales(d.id, d.data()))),
+        settings: {
+          monthKey,
+          monthlyTarget:
+            typeof data?.monthlyTarget === 'number' && Number.isFinite(data.monthlyTarget)
+              ? data.monthlyTarget
+              : 0,
+        },
+        fromCache: salesSnap.metadata.fromCache,
       }
     },
 

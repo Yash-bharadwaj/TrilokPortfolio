@@ -12,6 +12,9 @@ import { PerformanceCard } from '@/components/dashboard/performance-card'
 import { KeyNumbers } from '@/components/dashboard/key-numbers'
 import { ChannelCard, FoodCard } from '@/components/dashboard/breakdown-cards'
 import { InsightsCard } from '@/components/dashboard/insights-card'
+import { MissingDaysCard } from '@/components/dashboard/missing-days-card'
+import { OfflineNotice } from '@/components/dashboard/offline-notice'
+import { WeekdayCard } from '@/components/dashboard/weekday-card'
 import { TargetForm } from '@/components/dashboard/target-form'
 import { BrundavanEmblem } from '@/components/brand'
 import { useSales } from '@/providers/sales-provider'
@@ -19,8 +22,11 @@ import {
   useDailyMetrics,
   useFocusDate,
   useInsights,
+  useMissingDays,
+  useMonthComparison,
   useMonthlyMetrics,
   useShareDate,
+  useWeekdayPattern,
 } from '@/hooks/useMetrics'
 import { useReportSheet } from '@/hooks/useReport'
 import { formatMonthLabel } from '@/lib/date'
@@ -36,12 +42,16 @@ const ReportSheet = React.lazy(() =>
 
 export function DashboardPage() {
   const [params, setParams] = useSearchParams()
-  const { monthKey, entries, settings, loading, error } = useSales()
+  const { monthKey, entries, settings, loading, error, isOnline, hasServerData, pendingWrites } =
+    useSales()
   const focusDate = useFocusDate()
   const monthly = useMonthlyMetrics()
   const daily = useDailyMetrics(focusDate)
   const insights = useInsights(daily, monthly)
   const reportDate = useShareDate()
+  const missingDays = useMissingDays()
+  const weekdayPattern = useWeekdayPattern()
+  const comparison = useMonthComparison(monthly)
   const report = useReportSheet()
 
   // Saving sales lands here with ?share=<date>, which opens the report straight
@@ -79,6 +89,17 @@ export function DashboardPage() {
     )
   }
 
+  // Offline with nothing from the server: say so rather than totalling up only
+  // the entries that happen to be queued on this device.
+  if (!isOnline && !hasServerData) {
+    return (
+      <div className="space-y-4 pt-1">
+        <MonthSelector />
+        <OfflineNotice pendingWrites={pendingWrites} />
+      </div>
+    )
+  }
+
   if (firstRun) {
     return (
       <div className="mx-auto mt-6 max-w-sm">
@@ -100,7 +121,7 @@ export function DashboardPage() {
     <div className="space-y-4 pt-1">
       <MonthSelector />
 
-      <MonthSummaryCard monthly={monthly} />
+      <MonthSummaryCard monthly={monthly} comparison={comparison} />
 
       <TodayCard daily={daily} hasTarget={hasTarget} />
 
@@ -138,11 +159,13 @@ export function DashboardPage() {
         />
       ) : (
         <>
+          <MissingDaysCard missing={missingDays} />
           <PerformanceCard status={monthly.status} />
           <KeyNumbers monthly={monthly} />
           <React.Suspense fallback={<Skeleton className="h-72 w-full rounded-xl" />}>
             <TrendChart monthly={monthly} />
           </React.Suspense>
+          <WeekdayCard pattern={weekdayPattern} />
           <ChannelCard channels={monthly.channels} title="Where sales came from this month" />
           <FoodCard food={monthly.food} />
           <InsightsCard insights={insights} />

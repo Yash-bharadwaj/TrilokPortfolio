@@ -37,22 +37,35 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers())
 
 describe('sales model', () => {
-  it('reproduces the brief’s month-to-date total from net sales alone', () => {
+  it('adds the aggregators on top of restaurant sales', () => {
     const m = calculateMonthlyMetrics('2026-10', OCT, 300000)
-    expect(m.mtdSales).toBe(241648)
+    // 2,41,648 restaurant + 28,345 Swiggy + 33,127 Zomato
+    expect(m.mtdNetSales).toBe(241648)
+    expect(m.mtdSales).toBe(303120)
+  })
+
+  it('matches the brief’s own history rows, which use the summed total', () => {
+    // §17 lists 3 Oct as ₹65,876 and 4 Oct as ₹59,247.
+    expect(totalSalesOf(OCT[2]!)).toBe(65876)
+    expect(totalSalesOf(OCT[3]!)).toBe(59247)
   })
 
   it('splits channels so direct + swiggy + zomato equals the total', () => {
     const c = calculateChannelBreakdown(OCT)
     expect(c.direct + c.swiggy + c.zomato).toBe(c.total)
-    expect(c.total).toBe(241648)
+    expect(c.total).toBe(303120)
+    expect(c.direct).toBe(241648)
+    expect(c.swiggy).toBe(28345)
+    expect(c.zomato).toBe(33127)
     expect(c.inconsistent).toBe(false)
   })
 
-  it('flags an entry where the aggregators exceed the recorded total', () => {
+  it('cannot produce a negative restaurant figure under this model', () => {
+    // Aggregators add on top, so large Swiggy/Zomato can never eat into it.
     const c = calculateChannelBreakdown([day('2026-10-01', 1000, 800, 500)])
-    expect(c.inconsistent).toBe(true)
-    expect(c.direct).toBe(0)
+    expect(c.direct).toBe(1000)
+    expect(c.total).toBe(2300)
+    expect(c.inconsistent).toBe(false)
   })
 })
 
@@ -62,17 +75,17 @@ describe('monthly metrics', () => {
     expect(m.daysInMonth).toBe(31)
     expect(m.daysElapsed).toBe(5)
     expect(m.daysRemaining).toBe(26)
-    expect(m.achievement).toBeCloseTo(80.549, 2)
-    expect(m.remaining).toBe(58352)
+    expect(m.achievement).toBeCloseTo(101.04, 2)
+    expect(m.remaining).toBe(0)
     expect(m.baseDailyTarget).toBeCloseTo(300000 / 31, 6)
     expect(m.expectedToDate).toBeCloseTo((300000 / 31) * 5, 6)
-    expect(m.averageDailySales).toBeCloseTo(241648 / 5, 6)
-    expect(m.requiredDailyPace).toBeCloseTo(58352 / 26, 6)
+    expect(m.averageDailySales).toBeCloseTo(303120 / 5, 6)
+    expect(m.requiredDailyPace).toBe(0)
   })
 
   it('projects month-end from the running average', () => {
     const m = calculateMonthlyMetrics('2026-10', OCT, 300000)
-    expect(m.projection.projected).toBeCloseTo((241648 / 5) * 31, 4)
+    expect(m.projection.projected).toBeCloseTo((303120 / 5) * 31, 4)
     expect(m.projection.lowConfidence).toBe(false)
     expect(m.projection.varianceToTarget).toBeGreaterThan(0)
   })
@@ -95,7 +108,7 @@ describe('monthly metrics', () => {
 
   it('reports on track inside the tolerance band', () => {
     // Target chosen so the expected-to-date equals MTD sales exactly.
-    const target = (241648 / 5) * 31
+    const target = (303120 / 5) * 31
     const m = calculateMonthlyMetrics('2026-10', OCT, target)
     expect(m.status.tone).toBe('on-track')
   })
@@ -104,7 +117,7 @@ describe('monthly metrics', () => {
 describe('historical month-to-date', () => {
   it('excludes days after the report date', () => {
     const m = calculateMonthlyMetrics('2026-10', OCT, 300000, '2026-10-03')
-    expect(m.mtdSales).toBe(38456 + 53685 + 55810)
+    expect(m.mtdSales).toBe(51582 + 62882 + 65876)
     expect(m.entries.map((e) => e.date)).toEqual(['2026-10-01', '2026-10-02', '2026-10-03'])
     expect(m.daysElapsed).toBe(3)
     expect(m.daysRemaining).toBe(28)
@@ -113,7 +126,7 @@ describe('historical month-to-date', () => {
   it('never lets 4 or 5 October leak into a 3 October report', () => {
     const m = calculateMonthlyMetrics('2026-10', OCT, 300000, '2026-10-03')
     expect(m.entries.some((e) => e.date > '2026-10-03')).toBe(false)
-    expect(m.mtdSales).not.toBe(241648)
+    expect(m.mtdSales).not.toBe(303120)
   })
 
   it('scopes the channel split to the report date too', () => {
@@ -171,7 +184,7 @@ describe('edge cases', () => {
     const m = calculateMonthlyMetrics('2026-10', [OCT[0], OCT[4]], 300000)
     expect(m.daysRecorded).toBe(2)
     expect(m.daysElapsed).toBe(5)
-    expect(m.averageDailySales).toBeCloseTo((38456 + 51831) / 2, 6)
+    expect(m.averageDailySales).toBeCloseTo((51582 + 63533) / 2, 6)
   })
 
   it('gives no required pace once the month is over', () => {
@@ -190,10 +203,11 @@ describe('edge cases', () => {
 describe('daily metrics', () => {
   it('computes variance against the base daily target', () => {
     const d = calculateDailyMetrics('2026-10-05', OCT[4], 300000)
-    expect(d.totalSales).toBe(51831)
+    expect(d.totalSales).toBe(63533)
+    expect(d.netSales).toBe(51831)
     expect(d.baseDailyTarget).toBeCloseTo(300000 / 31, 6)
-    expect(d.variance).toBeCloseTo(51831 - 300000 / 31, 6)
-    expect(d.achievement).toBeCloseTo((51831 / (300000 / 31)) * 100, 6)
+    expect(d.variance).toBeCloseTo(63533 - 300000 / 31, 6)
+    expect(d.achievement).toBeCloseTo((63533 / (300000 / 31)) * 100, 6)
   })
 
   it('returns a null achievement for a day with no record', () => {
@@ -256,7 +270,126 @@ describe('indian currency formatting', () => {
 })
 
 describe('totals', () => {
-  it('credits the day total under the active model', () => {
-    expect(totalSalesOf(OCT[0])).toBe(38456)
+  it('credits restaurant plus aggregators as the day total', () => {
+    expect(totalSalesOf(OCT[0]!)).toBe(38456 + 7922 + 5204)
+    expect(totalSalesOf(OCT[0]!)).toBe(51582)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Features added after the first release
+// ---------------------------------------------------------------------------
+import { calculateWeekdayPattern } from '../patterns'
+import { findMissingDays } from '../gaps'
+import { compareToPreviousMonth } from '../comparison'
+import { buildMonthCsv } from '@/lib/csv'
+
+describe('missing days', () => {
+  it('lists elapsed days of the month with no record', () => {
+    const missing = findMissingDays('2026-10', [OCT[0], OCT[2]], '2026-10-05')
+    expect(missing).toEqual(['2026-10-02', '2026-10-04', '2026-10-05'])
+  })
+
+  it('never reports days that have not happened yet', () => {
+    const missing = findMissingDays('2026-10', OCT, '2026-10-05')
+    expect(missing).toEqual([])
+  })
+
+  it('reports the whole elapsed month when nothing is recorded', () => {
+    expect(findMissingDays('2026-10', [], '2026-10-03')).toEqual([
+      '2026-10-01',
+      '2026-10-02',
+      '2026-10-03',
+    ])
+  })
+})
+
+describe('weekday pattern', () => {
+  const march = Array.from({ length: 14 }, (_, i) =>
+    day(`2026-03-${String(i + 1).padStart(2, '0')}`, i % 7 === 0 ? 90000 : 30000),
+  )
+
+  it('averages each weekday over the days recorded for it', () => {
+    const p = calculateWeekdayPattern(march)
+    // 1 March 2026 is a Sunday, and every 7th day from it is the big one.
+    expect(p.best?.shortLabel).toBe('Sun')
+    expect(p.best?.average).toBe(90000)
+    expect(p.best?.days).toBe(2)
+    expect(p.reliable).toBe(true)
+  })
+
+  it('measures how far the best day sits above the overall average', () => {
+    const p = calculateWeekdayPattern(march)
+    const overall = (90000 * 2 + 30000 * 12) / 14
+    expect(p.overallAverage).toBeCloseTo(overall, 6)
+    expect(p.bestLift).toBeCloseTo(((90000 - overall) / overall) * 100, 6)
+  })
+
+  it('refuses to claim a pattern from too little data', () => {
+    expect(calculateWeekdayPattern(OCT).reliable).toBe(false)
+    expect(calculateWeekdayPattern([]).best).toBeNull()
+    expect(calculateWeekdayPattern([]).overallAverage).toBeNull()
+  })
+})
+
+describe('previous-month comparison', () => {
+  const sept = [
+    day('2026-09-01', 30000),
+    day('2026-09-02', 40000),
+    day('2026-09-03', 50000),
+    day('2026-09-28', 99000), // outside the 5-day window
+  ]
+
+  it('compares like for like, trimming the previous month to the days elapsed', () => {
+    const current = calculateMonthlyMetrics('2026-10', OCT, 300000)
+    const c = compareToPreviousMonth(current, '2026-09', sept)!
+    expect(c.daysCompared).toBe(5)
+    expect(c.trimmed).toBe(true)
+    expect(c.previousTotal).toBe(120000) // 28 Sept excluded
+    expect(c.currentTotal).toBe(303120)
+    expect(c.change).toBe(183120)
+    expect(c.changePercent).toBeCloseTo((183120 / 120000) * 100, 6)
+  })
+
+  it('returns nothing when the previous month has no data in range', () => {
+    const current = calculateMonthlyMetrics('2026-10', OCT, 300000)
+    expect(compareToPreviousMonth(current, '2026-09', [])).toBeNull()
+    expect(compareToPreviousMonth(current, '2026-09', [day('2026-09-28', 1000)])).toBeNull()
+  })
+})
+
+describe('csv export', () => {
+  it('writes plain numbers and a totals row', () => {
+    const m = calculateMonthlyMetrics('2026-10', OCT, 300000)
+    const csv = buildMonthCsv(m)
+    const lines = csv.split('\n')
+    expect(lines[0]).toContain('Sai Brundavan Grand')
+    expect(lines[2]).toContain('Date,Day,Total Sales,Restaurant')
+    expect(csv).toContain('2026-10-01')
+    // numbers, not formatted currency
+    expect(csv).not.toContain('₹2,41,648')
+    expect(csv).toContain('303120')
+    expect(lines[lines.length - 1]).toContain('TOTAL')
+  })
+
+  it('quotes a note containing a comma', () => {
+    const m = calculateMonthlyMetrics('2026-10', [day('2026-10-01', 100, 0, 0, { note: 'Diwali, busy' })], 300000)
+    expect(buildMonthCsv(m)).toContain('"Diwali, busy"')
+  })
+})
+
+describe('a finished month reads as a result, not a pace', () => {
+  it('says the target was missed rather than "behind pace"', () => {
+    const m = calculateMonthlyMetrics('2026-09', [day('2026-09-30', 1000)], 60000)
+    expect(m.daysRemaining).toBe(0)
+    expect(m.status.label).toBe('Target Missed')
+    expect(m.status.detail).toContain('finished')
+    expect(m.status.detail).not.toContain('per day')
+  })
+
+  it('says the target was beaten when it was', () => {
+    const m = calculateMonthlyMetrics('2026-09', [day('2026-09-30', 90000)], 60000)
+    expect(m.status.label).toBe('Target Beaten')
+    expect(m.status.detail).toContain('above the target')
   })
 })

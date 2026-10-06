@@ -25,7 +25,8 @@ import { DateField } from '@/components/dashboard/date-field'
 import { useSales } from '@/providers/sales-provider'
 import { collectSoftWarnings, dailySalesSchema, type DailySalesValues } from '@/schemas/sales'
 import { daysInMonthOf, formatLongDate, monthKeyOfDay, todayKey } from '@/lib/date'
-import { formatCurrency } from '@/lib/format'
+import { NET_HINT, NET_LABEL, totalSalesOf } from '@/calculations/config'
+import { formatCurrency, formatSignedCurrency } from '@/lib/format'
 import { friendlyError } from '@/lib/errors'
 import { cn } from '@/lib/utils'
 
@@ -147,6 +148,14 @@ export function AddSalesPage() {
 
   // The per-day figure is always derived from the month's target and the real
   // number of days in that month — it is never entered by hand.
+  // The figure that is actually credited against the target, recalculated on
+  // every keystroke so the manager never has to add it up.
+  const dayTotal = totalSalesOf({
+    netSales: values.netSales ?? 0,
+    swiggySales: values.swiggySales ?? 0,
+    zomatoSales: values.zomatoSales ?? 0,
+  })
+
   const dailyTarget =
     settings.monthlyTarget > 0 && dateMonth === settings.monthKey
       ? settings.monthlyTarget / daysInMonthOf(dateMonth)
@@ -226,9 +235,9 @@ export function AddSalesPage() {
           )}
 
           <MoneyField
-            label="Total sales for the day"
+            label={NET_LABEL}
             htmlFor="netSales"
-            hint="Including Swiggy and Zomato orders."
+            hint={NET_HINT}
             error={errors.netSales?.message}
           >
             <Controller
@@ -249,7 +258,10 @@ export function AddSalesPage() {
         </Card>
 
         <Card className="space-y-4 p-4">
-          <p className="text-sm font-semibold">Of that, how much came from…</p>
+          <p className="text-sm font-semibold">Online orders</p>
+          <p className="-mt-2 text-xs text-muted-foreground">
+            Added on top of restaurant sales. Leave blank if there were none.
+          </p>
           <MoneyField label="Swiggy" htmlFor="swiggySales" optional error={errors.swiggySales?.message}>
             <Controller
               control={control}
@@ -268,6 +280,34 @@ export function AddSalesPage() {
               )}
             />
           </MoneyField>
+        </Card>
+
+        <Card className="border-brand-200 bg-brand-50/60 p-4">
+          <div className="flex items-baseline justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold tracking-wide text-brand-700 uppercase">
+                Day total
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Restaurant + Swiggy + Zomato
+              </p>
+            </div>
+            <p className="tnum shrink-0 text-2xl font-extrabold" aria-live="polite">
+              {formatCurrency(dayTotal)}
+            </p>
+          </div>
+          {dailyTarget > 0 && dayTotal > 0 && (
+            <p className="mt-2 border-t border-brand-200/70 pt-2 text-xs text-muted-foreground">
+              <span
+                className={
+                  dayTotal >= dailyTarget ? 'font-semibold text-leaf-600' : 'font-semibold text-brand-600'
+                }
+              >
+                {formatSignedCurrency(dayTotal - dailyTarget)}
+              </span>{' '}
+              vs today's target of {formatCurrency(dailyTarget)}
+            </p>
+          )}
         </Card>
 
         <Card className="space-y-4 p-4">

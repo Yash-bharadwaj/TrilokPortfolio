@@ -1,5 +1,14 @@
 import * as React from 'react'
-import { calculateDailyMetrics, calculateMonthlyMetrics, generateInsights } from '@/calculations'
+import {
+  calculateDailyMetrics,
+  calculateMonthlyMetrics,
+  calculateWeekdayPattern,
+  compareToPreviousMonth,
+  findMissingDays,
+  generateInsights,
+} from '@/calculations'
+import type { WeekdayPattern } from '@/calculations/patterns'
+import type { MonthComparison } from '@/calculations/comparison'
 import { useSales } from '@/providers/sales-provider'
 import type { DailyMetrics, Insight, MonthlyMetrics } from '@/types'
 import { lastDayKey, todayKey } from '@/lib/date'
@@ -52,4 +61,25 @@ export function useFocusDate(): string {
     if (today.startsWith(monthKey)) return today
     return today > monthKey ? lastDayKey(monthKey) : `${monthKey}-01`
   }, [monthKey])
+}
+
+/** Elapsed days of the selected month with no record. */
+export function useMissingDays(asOf?: string): string[] {
+  const { monthKey, entries } = useSales()
+  return React.useMemo(() => findMissingDays(monthKey, entries, asOf), [monthKey, entries, asOf])
+}
+
+/** Average takings per weekday across the selected month. */
+export function useWeekdayPattern(): WeekdayPattern {
+  const { entries } = useSales()
+  return React.useMemo(() => calculateWeekdayPattern(entries), [entries])
+}
+
+/** This month against the same stretch of the month before. */
+export function useMonthComparison(monthly: MonthlyMetrics): MonthComparison | null {
+  const { previousMonth } = useSales()
+  return React.useMemo(() => {
+    if (!previousMonth) return null
+    return compareToPreviousMonth(monthly, previousMonth.monthKey, previousMonth.entries)
+  }, [monthly, previousMonth])
 }

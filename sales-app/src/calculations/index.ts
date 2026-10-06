@@ -1,3 +1,6 @@
 export * from './config'
 export * from './engine'
 export * from './insights'
+export * from './patterns'
+export * from './gaps'
+export * from './comparison'

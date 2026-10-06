@@ -1,1 +1,0 @@
-import{k as e}from"./index-BMkjS5fl.js";import{l as t,o as n,u as r}from"./firebase-BT-U5haa.js";var i,a,o;function s(){return i||=r(e),i}function c(){return a||=t(s()),a}function l(){return o||=n(s(),{}),o}export{l as getDb,c as getFirebaseAuth};

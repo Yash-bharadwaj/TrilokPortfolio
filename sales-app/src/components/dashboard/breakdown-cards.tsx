@@ -2,6 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ShareMeter, type MeterSlice } from './share-meter'
 import { CHANNEL_COLORS, FOOD_COLORS } from '@/lib/chart-palette'
 import { formatCurrency } from '@/lib/format'
+import { DIRECT_LABEL } from '@/calculations/config'
 import type { ChannelBreakdown, FoodBreakdown } from '@/types'
 
 export function ChannelCard({
@@ -14,7 +15,7 @@ export function ChannelCard({
   const slices: MeterSlice[] = [
     {
       key: 'direct',
-      label: 'Direct',
+      label: DIRECT_LABEL,
       value: channels.direct,
       share: channels.directShare,
       color: CHANNEL_COLORS.direct,

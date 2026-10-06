@@ -53,6 +53,18 @@ export function createLocalRepository(): SalesRepository {
       }
     },
 
+    async getMonthSnapshot(monthKey) {
+      const store = read()
+      return {
+        monthKey,
+        entries: sortEntries(
+          Object.values(store.sales).filter((e) => monthKeyOfDay(e.date) === monthKey),
+        ),
+        settings: { ...emptySettings(monthKey), monthlyTarget: store.targets[monthKey] ?? 0 },
+        fromCache: false,
+      }
+    },
+
     async saveDay(entry) {
       const store = read()
       store.sales[entry.date] = { ...entry, updatedAt: Date.now() }

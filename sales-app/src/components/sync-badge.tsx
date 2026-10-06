@@ -10,8 +10,10 @@ const MAP = {
 
 /** Entered data is never silently lost — the manager can always see where it stands. */
 export function SyncBadge({ className }: { className?: string }) {
-  const { syncStatus } = useSales()
+  const { syncStatus, pendingWrites } = useSales()
   const { icon: Icon, label, className: tone } = MAP[syncStatus]
+  // Entries saved on the device but not yet confirmed by the server.
+  const waiting = pendingWrites > 0 && syncStatus !== 'synced'
   return (
     <span
       className={cn('inline-flex items-center gap-1 text-[0.7rem] font-semibold', tone, className)}
@@ -19,7 +21,7 @@ export function SyncBadge({ className }: { className?: string }) {
       aria-live="polite"
     >
       <Icon className={cn('size-3', syncStatus === 'pending' && 'animate-spin')} aria-hidden />
-      {label}
+      {waiting ? `${label} ${pendingWrites}` : label}
     </span>
   )
 }

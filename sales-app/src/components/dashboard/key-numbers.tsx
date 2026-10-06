@@ -32,8 +32,14 @@ export function KeyNumbers({ monthly }: { monthly: MonthlyMetrics }) {
         hint={`${formatCurrency(monthly.monthlyTarget)} ÷ ${monthly.daysInMonth} days`}
       />
       <Stat
-        label="Month may end at"
-        value={projection.projected === null ? '—' : formatCurrency(projection.projected)}
+        label={monthly.daysRemaining === 0 ? 'Month finished at' : 'Month may end at'}
+        value={
+          monthly.daysRemaining === 0
+            ? formatCurrency(monthly.mtdSales)
+            : projection.projected === null
+              ? '—'
+              : formatCurrency(projection.projected)
+        }
         hint={
           projection.projected === null
             ? 'needs at least one day'

@@ -3,6 +3,9 @@ import { isFirebaseConfigured } from '@/firebase/env'
 import { createLocalRepository } from '@/services/localRepository'
 import type { MonthSnapshot, SalesRepository } from '@/services/repository'
 import { emptySettings } from '@/services/repository'
+import { flushOutbox, withOutbox } from '@/services/outboxRepository'
+import { listPending, OUTBOX_EVENT } from '@/services/outbox'
+import { shiftMonth } from '@/lib/date'
 import type { DailySales, MonthSettings } from '@/types'
 import { currentMonthKey, monthKeyOfDay } from '@/lib/date'
 import { friendlyError } from '@/lib/errors'
@@ -20,6 +23,16 @@ interface SalesState {
   syncStatus: SyncStatus
   isOnline: boolean
   entryFor: (date: string) => DailySales | null
+  /** Previous month's totals, fetched once for the comparison. */
+  previousMonth: MonthSnapshot | null
+  /** Writes saved on the device but not yet confirmed by the server. */
+  pendingWrites: number
+  /**
+   * False until this month's data has actually come back from the server.
+   * Offline from a cold start we hold only unsent entries, which must not be
+   * presented as if they were the whole month.
+   */
+  hasServerData: boolean
   saveDay: (entry: DailySales) => Promise<void>
   deleteDay: (date: string) => Promise<void>
   saveMonthlyTarget: (monthKey: string, target: number) => Promise<void>
@@ -36,6 +49,7 @@ export function SalesProvider({ children }: { children: React.ReactNode }) {
   const { userId } = useAuth()
   const [monthKey, setMonthKey] = React.useState(currentMonthKey)
   const [snapshot, setSnapshot] = React.useState<MonthSnapshot | null>(null)
+  const [hasServerData, setHasServerData] = React.useState(false)
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [isOnline, setIsOnline] = React.useState(() => navigator.onLine)
@@ -43,12 +57,19 @@ export function SalesProvider({ children }: { children: React.ReactNode }) {
   // Firestore is loaded on demand; until it arrives (or when Firebase is not
   // configured at all) the on-device store serves the same contract.
   const [repository, setRepository] = React.useState<SalesRepository | null>(null)
+  const repositoryRef = React.useRef<SalesRepository | null>(null)
+  repositoryRef.current = repository
 
   React.useEffect(() => {
     let cancelled = false
     if (isFirebaseConfigured && userId) {
       void import('@/services/firestoreRepository').then((m) => {
-        if (!cancelled) setRepository(() => m.createFirestoreRepository(userId))
+        if (cancelled) return
+        // Only the cloud repository needs an outbox; the on-device store is
+        // already durable by definition.
+        const remote = m.createFirestoreRepository(userId)
+        flushOutbox(remote)
+        setRepository(() => withOutbox(remote))
       })
     } else {
       setRepository(() => createLocalRepository())
@@ -58,21 +79,38 @@ export function SalesProvider({ children }: { children: React.ReactNode }) {
     }
   }, [userId])
 
+  const [pendingWrites, setPendingWrites] = React.useState(() => listPending().length)
+
   React.useEffect(() => {
-    const on = () => setIsOnline(true)
+    const sync = () => setPendingWrites(listPending().length)
+    const on = () => {
+      setIsOnline(true)
+      sync()
+    }
     const off = () => setIsOnline(false)
     window.addEventListener('online', on)
     window.addEventListener('offline', off)
+    window.addEventListener(OUTBOX_EVENT, sync)
+    window.addEventListener('storage', sync)
     return () => {
       window.removeEventListener('online', on)
       window.removeEventListener('offline', off)
+      window.removeEventListener(OUTBOX_EVENT, sync)
+      window.removeEventListener('storage', sync)
     }
   }, [])
+
+  // Anything still queued goes out as soon as the connection returns.
+  React.useEffect(() => {
+    if (!repositoryRef.current || !isOnline || pendingWrites === 0) return
+    flushOutbox(repositoryRef.current)
+  }, [isOnline, pendingWrites])
 
   React.useEffect(() => {
     if (!repository) return
     setLoading(true)
     setError(null)
+    setHasServerData(false)
 
     // If the first snapshot never arrives we say so, rather than leaving the
     // manager looking at loading skeletons with no idea what is wrong. We never
@@ -88,6 +126,7 @@ export function SalesProvider({ children }: { children: React.ReactNode }) {
       (next) => {
         window.clearTimeout(watchdog)
         setSnapshot(next)
+        if (!next.fromCache) setHasServerData(true)
         setError(null)
         setLoading(false)
       },
@@ -117,9 +156,29 @@ export function SalesProvider({ children }: { children: React.ReactNode }) {
 
   const syncStatus: SyncStatus = !isOnline
     ? 'offline'
-    : snapshot?.fromCache && isFirebaseConfigured
+    : pendingWrites > 0 || (snapshot?.fromCache && isFirebaseConfigured)
       ? 'pending'
       : 'synced'
+
+  const [previousMonth, setPreviousMonth] = React.useState<MonthSnapshot | null>(null)
+
+  React.useEffect(() => {
+    if (!repository) return
+    let cancelled = false
+    setPreviousMonth(null)
+    // A one-off read, not a listener: a finished month does not change.
+    void repository
+      .getMonthSnapshot(shiftMonth(monthKey, -1))
+      .then((snap) => {
+        if (!cancelled) setPreviousMonth(snap)
+      })
+      .catch(() => {
+        if (!cancelled) setPreviousMonth(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [repository, monthKey])
 
   const entryFor = React.useCallback(
     (date: string) => entries.find((e) => e.date === date) ?? null,
@@ -164,6 +223,9 @@ export function SalesProvider({ children }: { children: React.ReactNode }) {
       syncStatus,
       isOnline,
       entryFor,
+      previousMonth,
+      pendingWrites,
+      hasServerData,
       saveDay,
       deleteDay,
       saveMonthlyTarget,
@@ -179,6 +241,9 @@ export function SalesProvider({ children }: { children: React.ReactNode }) {
       syncStatus,
       isOnline,
       entryFor,
+      previousMonth,
+      pendingWrites,
+      hasServerData,
       saveDay,
       deleteDay,
       saveMonthlyTarget,

@@ -15,6 +15,8 @@ export interface SalesRepository {
     onData: (snapshot: MonthSnapshot) => void,
     onError: (error: unknown) => void,
   ): () => void
+  /** One-off read, used for the previous-month comparison. No listener is kept open. */
+  getMonthSnapshot(monthKey: string): Promise<MonthSnapshot>
   saveDay(entry: DailySales): Promise<void>
   deleteDay(date: string): Promise<void>
   saveMonthlyTarget(monthKey: string, target: number): Promise<void>

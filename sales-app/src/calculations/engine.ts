@@ -152,18 +152,33 @@ export function calculatePerformanceStatus(
 
   const tolerance = expectedToDate * PACE_TOLERANCE
 
+  // A finished month is reported as a result, not as a pace to catch up on.
+  const finished = daysRemaining === 0
+
   if (paceVariance > tolerance) {
     return {
       tone: 'ahead',
-      label: 'Ahead of Target',
-      emoji: '🔥',
-      detail: `You are ${currency(paceVariance)} ahead of the expected pace for this point in the month.`,
+      label: finished ? 'Target Beaten' : 'Ahead of Target',
+      emoji: finished ? '🎉' : '🔥',
+      detail: finished
+        ? `The month finished ${currency(paceVariance)} above the target.`
+        : `You are ${currency(paceVariance)} ahead of the expected pace for this point in the month.`,
       paceVariance,
     }
   }
   if (paceVariance < -tolerance) {
+    const short = currency(Math.abs(paceVariance))
+    if (finished) {
+      return {
+        tone: 'behind',
+        label: 'Target Missed',
+        emoji: '⚠️',
+        detail: `The month finished ${short} below the target.`,
+        paceVariance,
+      }
+    }
     const need =
-      daysRemaining > 0 && requiredDailyPace !== null
+      requiredDailyPace !== null
         ? ` You need ${currency(requiredDailyPace)} per day over the remaining ${daysRemaining} ${
             daysRemaining === 1 ? 'day' : 'days'
           } to reach the target.`
@@ -172,15 +187,17 @@ export function calculatePerformanceStatus(
       tone: 'behind',
       label: 'Behind Target',
       emoji: '⚠️',
-      detail: `You are ${currency(Math.abs(paceVariance))} below the expected pace.${need}`,
+      detail: `You are ${short} below the expected pace.${need}`,
       paceVariance,
     }
   }
   return {
     tone: 'on-track',
-    label: 'On Track',
+    label: finished ? 'Target Met' : 'On Track',
     emoji: '🎯',
-    detail: 'Sales are running in line with the monthly target pace.',
+    detail: finished
+      ? 'The month finished in line with the target.'
+      : 'Sales are running in line with the monthly target pace.',
     paceVariance,
   }
 }

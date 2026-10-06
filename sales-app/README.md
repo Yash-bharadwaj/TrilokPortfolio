@@ -25,23 +25,20 @@ if you need to recreate it.
 ## The one business rule worth knowing
 
 The handwritten sheet's `Net Sale | Swiggy | Zomato | Total Sale` columns do not
-say on their own whether the total includes the aggregators. The brief's own
-figures settle it:
+say on their own whether the total includes the aggregators, and the written
+brief argued both ways. The hotel settled it:
 
-```
-38,456 + 53,685 + 55,810 + 41,866 + 51,831 = 2,41,648   ← the quoted MTD total
-1,81,348 (Direct) + 32,500 (Swiggy) + 27,800 (Zomato) = 2,41,648
-```
+- `total  = netSales + swiggy + zomato`
+- `direct = netSales` — the restaurant's own dine-in and takeaway trade
 
-Both only balance if **Net Sales already contains Swiggy and Zomato**, and
-Direct is the remainder. So:
-
-- `total = netSales`
-- `direct = netSales − swiggy − zomato`
+The brief's History example corroborates it: it lists 3 October as ₹65,876 and
+4 October as ₹59,247, which are exactly `net + swiggy + zomato` for those days.
+(Its channel-split example elsewhere implies the opposite, so the sheet's
+"Total Sale" column was not consistent. Nothing here depends on it.)
 
 This lives in exactly one place, [`src/calculations/config.ts`](./src/calculations/config.ts).
-If the hotel ever says otherwise, flip `SALES_MODEL` to `'net-excludes-online'`
-and nothing else changes.
+Flipping `SALES_MODEL` swaps the rule, the wording and the column headings
+together; nothing else changes.
 
 ## The calculations
 
@@ -57,13 +54,17 @@ component, and covered by 31 tests (`npm test`).
 | Needed per day        | `remaining ÷ days remaining`                        |
 | Average per day       | `MTD sales ÷ days **recorded**`                     |
 | Projected month-end   | `average per day × days in month`                   |
+| vs last month         | previous month trimmed to the same days elapsed     |
+| Weekday pattern       | each weekday averaged over its own recorded days    |
 
-Three deliberate choices:
+Four deliberate choices:
 
 - **The average divides by days recorded, not calendar days.** A missing day is
   unrecorded, which is not the same as a day with zero sales.
 - **Month length is always real.** 30, 31, 28, and 29 in a leap year — all tested.
 - **A zero target yields `null`, never `Infinity`.** The UI shows "—".
+- **A finished month reads as a result, not a pace.** "Target Missed", not
+  "you need ₹X per day" for days that no longer exist.
 
 ### Historical reports
 
@@ -113,6 +114,20 @@ and validates amounts server-side as well as in the form.
 
 Duplicate dates cannot happen — the date is the document id. Choosing a date
 that already has sales loads them and switches the screen to editing.
+
+## Keeping the data honest
+
+Three things exist because a wrong number is worse than no number:
+
+- **Missing days** are listed on the dashboard. The month's average divides by
+  days recorded, so an unnoticed gap quietly flatters it.
+- **Offline from a cold start**, the dashboard says so rather than totalling up
+  only the entries queued on that device.
+- **Unsent writes** are queued in `localStorage`
+  ([`services/outbox.ts`](./src/services/outbox.ts)) and flushed on reconnect, so
+  an entry made on a bad connection survives the app being closed. Every queued
+  operation is an idempotent overwrite keyed by document id, which is what makes
+  "queue, send, then dequeue" safe to replay.
 
 ## Charts
 

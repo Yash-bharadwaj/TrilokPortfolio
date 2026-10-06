@@ -3,7 +3,7 @@ import { brundavanLogoSrc } from '@/components/brand'
 import { CHANNEL_COLORS, FOOD_COLORS } from '@/lib/chart-palette'
 import { formatCurrency, formatPercent, formatSignedCurrency } from '@/lib/format'
 import { formatLongDate, todayKey } from '@/lib/date'
-import { HOTEL } from '@/calculations/config'
+import { DIRECT_LABEL, HOTEL } from '@/calculations/config'
 import type { ReportData } from '@/types'
 
 export const REPORT_WIDTH = 1080
@@ -280,7 +280,7 @@ export const ReportCanvas = forwardRef<HTMLDivElement, { data: ReportData }>(
               />
               <div style={{ marginTop: 6 }}>
                 <MeterRow
-                  label="Direct"
+                  label={DIRECT_LABEL}
                   value={channels.direct}
                   share={channels.directShare}
                   color={CHANNEL_COLORS.direct}
@@ -408,11 +408,13 @@ export const ReportCanvas = forwardRef<HTMLDivElement, { data: ReportData }>(
                   }
                 />
                 <StatCell
-                  label="May end at"
+                  label={monthly.daysRemaining === 0 ? 'Finished at' : 'May end at'}
                   value={
-                    monthly.projection.projected === null
-                      ? '—'
-                      : formatCurrency(monthly.projection.projected)
+                    monthly.daysRemaining === 0
+                      ? formatCurrency(monthly.mtdSales)
+                      : monthly.projection.projected === null
+                        ? '—'
+                        : formatCurrency(monthly.projection.projected)
                   }
                 />
               </div>

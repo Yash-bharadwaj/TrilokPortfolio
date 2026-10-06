@@ -1,4 +1,5 @@
-import { LogOutIcon, PhoneIcon, MapPinIcon } from 'lucide-react'
+import { LogOutIcon, PhoneIcon, MapPinIcon, DownloadIcon } from 'lucide-react'
+import { toast } from 'sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -8,10 +9,23 @@ import { BrundavanLogo } from '@/components/brand'
 import { useAuth } from '@/providers/auth-provider'
 import { useSales } from '@/providers/sales-provider'
 import { HOTEL, SALES_MODEL_NOTE } from '@/calculations/config'
+import { useMonthlyMetrics } from '@/hooks/useMetrics'
+import { buildMonthCsv, downloadCsv, monthCsvFileName } from '@/lib/csv'
+import { formatMonthLabel } from '@/lib/date'
 
 export function SettingsPage() {
   const { signOutUser, displayName, backend } = useAuth()
-  const { monthKey } = useSales()
+  const { monthKey, loading } = useSales()
+  const monthly = useMonthlyMetrics()
+
+  function handleExport() {
+    if (monthly.entries.length === 0) {
+      toast.error('No sales recorded for this month yet.')
+      return
+    }
+    downloadCsv(buildMonthCsv(monthly), monthCsvFileName(monthKey))
+    toast.success('Spreadsheet downloaded.')
+  }
 
   return (
     <div className="mx-auto max-w-lg space-y-4 pt-1">
@@ -53,6 +67,27 @@ export function SettingsPage() {
               </a>
             </p>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Download for accounts</CardTitle>
+          <CardDescription>
+            Every day of {formatMonthLabel(monthKey)} as a spreadsheet, with a totals row.
+            Opens in Excel.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={handleExport}
+            disabled={loading}
+          >
+            <DownloadIcon className="size-4" />
+            {loading ? 'Loading…' : `Download ${formatMonthLabel(monthKey)} (CSV)`}
+          </Button>
         </CardContent>
       </Card>
 
