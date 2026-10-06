@@ -1,0 +1,123 @@
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/fraunces/wght.css';
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+/*
+  Sai Brundavan Grand design tokens.
+  Brand colours are derived from the hotel logo: the wordmark red (#FF002A,
+  deepened for UI legibility) and the veg-mark green (#1FB35E).
+*/
+@theme {
+  --font-sans: 'Inter Variable', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Fraunces Variable', 'Fraunces', 'Iowan Old Style', Georgia, serif;
+  --font-numeric: 'Inter Variable', 'Inter', ui-sans-serif, system-ui, sans-serif;
+
+  --color-brand-50: #fdf3f4;
+  --color-brand-100: #fbe4e7;
+  --color-brand-200: #f7ccd2;
+  --color-brand-300: #f0a3ae;
+  --color-brand-400: #e66a7e;
+  --color-brand-500: #d93a53;
+  --color-brand-600: #c41f3b;
+  --color-brand-700: #a4162e;
+  --color-brand-800: #8f1d2c;
+  --color-brand-900: #76192a;
+  --color-brand-950: #420a13;
+
+  --color-leaf-50: #f0fdf4;
+  --color-leaf-100: #dcfce7;
+  --color-leaf-300: #86e3ab;
+  --color-leaf-500: #15a05a;
+  --color-leaf-600: #10864b;
+  --color-leaf-700: #0d6b3d;
+
+  --color-paper: #faf8f5;
+  --color-ink: #1a1614;
+
+  --color-background: #faf8f5;
+  --color-foreground: #1a1614;
+  --color-card: #ffffff;
+  --color-card-foreground: #1a1614;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #1a1614;
+  --color-primary: #8f1d2c;
+  --color-primary-foreground: #fff8f3;
+  --color-secondary: #f3efe9;
+  --color-secondary-foreground: #3b322d;
+  --color-muted: #f3efe9;
+  --color-muted-foreground: #7a6f68;
+  --color-accent: #f6ece9;
+  --color-accent-foreground: #8f1d2c;
+  --color-destructive: #c41f3b;
+  --color-destructive-foreground: #fff8f3;
+  --color-success: #10864b;
+  --color-warning: #b45309;
+  --color-border: #e8e1d8;
+  --color-input: #e8e1d8;
+  --color-ring: #c41f3b;
+
+  --radius-xs: 0.375rem;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.5rem;
+
+  --shadow-card: 0 1px 2px rgb(26 22 20 / 0.04), 0 8px 24px -12px rgb(26 22 20 / 0.10);
+  --shadow-raise: 0 2px 4px rgb(26 22 20 / 0.05), 0 16px 40px -16px rgb(26 22 20 / 0.16);
+}
+
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    overflow-x: hidden;
+    overscroll-behavior-y: none;
+  }
+
+  /* Numbers must never wobble as they tick up. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+
+  /* iOS zooms any input rendered below 16px on focus. */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+@utility safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@utility safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}

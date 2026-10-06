@@ -1,0 +1,84 @@
+rules_version = '2';
+
+// Sai Brundavan Grand — sales data.
+//
+// Nothing is world-readable. A signed-in user may only touch the hotel they
+// are assigned to in `users/{uid}`, which also carries their role. The shape
+// allows a second property to be added later without changing these rules.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function profile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function belongsTo(hotelId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && profile().hotelId == hotelId;
+    }
+
+    function hasRole(hotelId, roles) {
+      return belongsTo(hotelId) && profile().role in roles;
+    }
+
+    // A user may read their own profile. Roles are assigned from the console
+    // only — never writable by the client.
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    match /hotels/{hotelId} {
+      allow read: if belongsTo(hotelId);
+      allow write: if hasRole(hotelId, ['owner']);
+
+      // Monthly target. Owners and managers may set it; staff may only read.
+      match /months/{monthId} {
+        allow read: if belongsTo(hotelId);
+        allow create, update: if hasRole(hotelId, ['owner', 'manager'])
+          && validMonth();
+        allow delete: if hasRole(hotelId, ['owner']);
+
+        function validMonth() {
+          let d = request.resource.data;
+          return (!('monthlyTarget' in d)
+                   || (d.monthlyTarget is number
+                       && d.monthlyTarget >= 0
+                       && d.monthlyTarget <= 100000000))
+                 && monthId.matches('^[0-9]{4}-[0-9]{2}$');
+        }
+      }
+
+      // One document per trading day, keyed YYYY-MM-DD.
+      match /months/{monthId}/sales/{dayId} {
+        allow read: if belongsTo(hotelId);
+        allow create, update: if hasRole(hotelId, ['owner', 'manager', 'staff'])
+          && validDay();
+        allow delete: if hasRole(hotelId, ['owner', 'manager']);
+
+        function amount(value) {
+          return value is number && value >= 0 && value <= 100000000;
+        }
+
+        function validDay() {
+          let d = request.resource.data;
+          return dayId.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+            && d.date == dayId
+            && dayId.matches('^' + monthId + '.*')
+            && amount(d.netSales)
+            && amount(d.swiggySales)
+            && amount(d.zomatoSales)
+            && amount(d.vegSales)
+            && amount(d.nonVegSales)
+            && amount(d.expenses)
+            && (!('note' in d) || (d.note is string && d.note.size() <= 200));
+        }
+      }
+    }
+  }
+}

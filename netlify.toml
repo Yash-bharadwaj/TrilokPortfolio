@@ -1,6 +1,16 @@
 [build]
   publish = "."
 
+# ---------------------------------------------------------------------------
+# /sales is the Sai Brundavan Grand sales app (a single-page app built from
+# sales-app/). Netlify serves a real file when one exists, so this rewrite only
+# catches in-app routes such as /sales/history and hands them to the SPA.
+# ---------------------------------------------------------------------------
+[[redirects]]
+  from = "/sales/*"
+  to = "/sales/index.html"
+  status = 200
+
 [[headers]]
   for = "/*"
   [headers.values]
@@ -9,3 +19,21 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+
+# Hashed build assets never change under the same name.
+[[headers]]
+  for = "/sales/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# The service worker and shell must always be revalidated, or a new release
+# would never reach a phone that already has the app installed.
+[[headers]]
+  for = "/sales/sw.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/sales/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"

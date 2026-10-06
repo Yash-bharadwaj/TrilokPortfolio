@@ -1,0 +1,6 @@
+# The original build brief — kept locally only: it contains credentials in
+# plain text and this repository is public.
+forwardproject.md
+
+.DS_Store
+node_modules
