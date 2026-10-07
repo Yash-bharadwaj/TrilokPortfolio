@@ -60,14 +60,24 @@ export interface SoftWarning {
  * Soft and informational checks. These surface likely mistakes but never block
  * saving, because the hotel may legitimately record categories we cannot model.
  */
-export function collectSoftWarnings(values: {
-  netSales: number | null
-  swiggySales: number | null
-  zomatoSales: number | null
-  vegSales: number | null
-  nonVegSales: number | null
-  expenses: number | null
-}): SoftWarning[] {
+export interface DayContext {
+  /** Total already recorded for earlier days of the same month. */
+  monthToDateBefore: number
+  /** How many earlier days of the month are recorded. */
+  priorDays: number
+}
+
+export function collectSoftWarnings(
+  values: {
+    netSales: number | null
+    swiggySales: number | null
+    zomatoSales: number | null
+    vegSales: number | null
+    nonVegSales: number | null
+    expenses: number | null
+  },
+  context?: DayContext,
+): SoftWarning[] {
   const net = values.netSales ?? 0
   const swiggy = values.swiggySales ?? 0
   const zomato = values.zomatoSales ?? 0
@@ -114,6 +124,28 @@ export function collectSoftWarnings(values: {
       id: 'expenses-exceed-sales',
       level: 'warning',
       message: `Expenses (${formatCurrency(expenses)}) exceed the day's sales. Please verify.`,
+    })
+  }
+
+  /*
+   * The hotel's handwritten sheet carries a running month-to-date column
+   * alongside the daily one, and it is easy to copy the wrong column. A single
+   * day that matches or beats everything recorded so far is the signature of
+   * that mistake, so it is worth questioning — but never blocking, because a
+   * festival day really can do it.
+   */
+  if (
+    context &&
+    context.priorDays >= 2 &&
+    context.monthToDateBefore > 0 &&
+    dayTotal >= context.monthToDateBefore * 0.95
+  ) {
+    warnings.push({
+      id: 'looks-cumulative',
+      level: 'warning',
+      message: `${formatCurrency(dayTotal)} is as much as the whole month so far (${formatCurrency(
+        context.monthToDateBefore,
+      )}). If you are reading a running total, enter only this day's sales — the app adds up the month for you.`,
     })
   }
 

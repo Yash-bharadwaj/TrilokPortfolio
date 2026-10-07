@@ -89,7 +89,8 @@ function MoneyField({
 export function AddSalesPage() {
   const [params] = useSearchParams()
   const navigate = useNavigate()
-  const { entryFor, saveDay, deleteDay, settings, loading, monthKey, setMonthKey } = useSales()
+  const { entryFor, saveDay, deleteDay, settings, loading, monthKey, setMonthKey, entries } =
+    useSales()
 
   const requested = params.get('date')
   const initialDate = requested && /^\d{4}-\d{2}-\d{2}$/.test(requested) ? requested : todayKey()
@@ -144,7 +145,21 @@ export function AddSalesPage() {
   }, [ready, date, entryFor, reset])
 
   const values = watch()
-  const warnings = React.useMemo(() => collectSoftWarnings(values), [values])
+
+  // What the month already holds before this date, used to spot a running
+  // total being entered where a single day belongs.
+  const dayContext = React.useMemo(() => {
+    const prior = entries.filter((e) => e.date < date && monthKeyOfDay(e.date) === dateMonth)
+    return {
+      monthToDateBefore: prior.reduce((sum, e) => sum + totalSalesOf(e), 0),
+      priorDays: prior.length,
+    }
+  }, [entries, date, dateMonth])
+
+  const warnings = React.useMemo(
+    () => collectSoftWarnings(values, dayContext),
+    [values, dayContext],
+  )
 
   // The per-day figure is always derived from the month's target and the real
   // number of days in that month — it is never entered by hand.

@@ -285,6 +285,7 @@ import { compareToPreviousMonth } from '../comparison'
 import { generateInsights } from '../insights'
 import type { Insight } from '@/types'
 import { buildMonthCsv } from '@/lib/csv'
+import { collectSoftWarnings } from '@/schemas/sales'
 
 describe('missing days', () => {
   it('lists elapsed days of the month with no record', () => {
@@ -416,5 +417,32 @@ describe('insight scope', () => {
       expect(insight.text).not.toMatch(/today/i)
       expect(insight.text).not.toMatch(/previous recorded day/i)
     }
+  })
+})
+
+describe('running-total safeguard', () => {
+  const entry = { netSales: 50000, swiggySales: 5000, zomatoSales: 5000, vegSales: null, nonVegSales: null, expenses: null }
+
+  it('questions a day that matches the whole month so far', () => {
+    const w = collectSoftWarnings(entry, { monthToDateBefore: 60000, priorDays: 4 })
+    const hit = w.find((x) => x.id === 'looks-cumulative')
+    expect(hit).toBeDefined()
+    expect(hit!.level).toBe('warning')
+    expect(hit!.message).toMatch(/running total/i)
+  })
+
+  it('stays quiet on an ordinary day', () => {
+    const w = collectSoftWarnings(entry, { monthToDateBefore: 400000, priorDays: 6 })
+    expect(w.find((x) => x.id === 'looks-cumulative')).toBeUndefined()
+  })
+
+  it('stays quiet too early in the month to judge', () => {
+    const w = collectSoftWarnings(entry, { monthToDateBefore: 40000, priorDays: 1 })
+    expect(w.find((x) => x.id === 'looks-cumulative')).toBeUndefined()
+  })
+
+  it('never blocks saving', () => {
+    const w = collectSoftWarnings(entry, { monthToDateBefore: 60000, priorDays: 4 })
+    expect(w.every((x) => x.level === 'warning' || x.level === 'info')).toBe(true)
   })
 })
