@@ -93,3 +93,20 @@ export function daysOfMonth(monthKey: MonthKey): DayKey[] {
   const n = daysInMonthOf(monthKey)
   return Array.from({ length: n }, (_, i) => `${monthKey}-${String(i + 1).padStart(2, '0')}`)
 }
+
+/** Every month key touched by an inclusive day range, in order. */
+export function monthsBetween(from: DayKey, to: DayKey): MonthKey[] {
+  const start = fromMonthKey(monthKeyOfDay(from))
+  const endKey = monthKeyOfDay(to)
+  const months: MonthKey[] = []
+  for (let d = start; toMonthKey(d) <= endKey; d.setMonth(d.getMonth() + 1)) {
+    months.push(toMonthKey(d))
+    if (months.length > 240) break // a twenty-year range is a mistake, not a report
+  }
+  return months
+}
+
+/** `1 Oct 2026 – 15 Nov 2026` */
+export function formatRangeLabel(from: DayKey, to: DayKey): string {
+  return `${formatShortDate(from)} – ${formatShortDate(to)}`
+}

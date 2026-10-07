@@ -282,6 +282,8 @@ describe('totals', () => {
 import { calculateWeekdayPattern } from '../patterns'
 import { findMissingDays } from '../gaps'
 import { compareToPreviousMonth } from '../comparison'
+import { generateInsights } from '../insights'
+import type { Insight } from '@/types'
 import { buildMonthCsv } from '@/lib/csv'
 
 describe('missing days', () => {
@@ -391,5 +393,28 @@ describe('a finished month reads as a result, not a pace', () => {
     const m = calculateMonthlyMetrics('2026-09', [day('2026-09-30', 90000)], 60000)
     expect(m.status.label).toBe('Target Beaten')
     expect(m.status.detail).toContain('above the target')
+  })
+})
+
+describe('insight scope', () => {
+  const withFood = OCT.map((e) => ({ ...e, vegSales: 1000, nonVegSales: 500, expenses: 4000 }))
+
+  it('tags every insight as day or month', () => {
+    const monthly = calculateMonthlyMetrics('2026-10', withFood, 300000)
+    const daily = calculateDailyMetrics('2026-10-05', withFood[4]!, 300000)
+    const all = generateInsights(daily, monthly)
+    expect(all.length).toBeGreaterThan(3)
+    expect(all.every((i: Insight) => i.scope === 'day' || i.scope === 'month')).toBe(true)
+  })
+
+  it('keeps "today" statements out of the month-scoped set', () => {
+    const monthly = calculateMonthlyMetrics('2026-10', withFood, 300000)
+    const daily = calculateDailyMetrics('2026-10-05', withFood[4]!, 300000)
+    const monthOnly = generateInsights(daily, monthly).filter((i: Insight) => i.scope === 'month')
+    expect(monthOnly.length).toBeGreaterThan(0)
+    for (const insight of monthOnly) {
+      expect(insight.text).not.toMatch(/today/i)
+      expect(insight.text).not.toMatch(/previous recorded day/i)
+    }
   })
 })

@@ -1,9 +1,10 @@
 import { forwardRef } from 'react'
 import { brundavanLogoSrc } from '@/components/brand'
 import { CHANNEL_COLORS, FOOD_COLORS } from '@/lib/chart-palette'
-import { formatCurrency, formatPercent, formatSignedCurrency } from '@/lib/format'
+import { formatCurrency, formatPercent, formatSignedCurrencyWithPercent } from '@/lib/format'
 import { formatLongDate, todayKey } from '@/lib/date'
-import { DIRECT_LABEL, HOTEL } from '@/calculations/config'
+import { DIRECT_LABEL, HOTEL, REPORT_SIGNATURE } from '@/calculations/config'
+import { topInsights } from '@/calculations/insights'
 import type { ReportData } from '@/types'
 
 export const REPORT_WIDTH = 1080
@@ -71,14 +72,18 @@ function MeterRow({
   value,
   share,
   color,
+  compact,
 }: {
   label: string
   value: number
   share: number
   color: string
+  compact?: boolean
 }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 13, padding: '4px 0' }}>
+    <div
+      style={{ display: 'flex', alignItems: 'center', gap: 13, padding: compact ? '2px 0' : '4px 0' }}
+    >
       <span style={{ width: 13, height: 13, borderRadius: 99, background: color, flexShrink: 0 }} />
       <span style={{ flex: 1, fontSize: 24, fontWeight: 600, color: '#3b322d' }}>{label}</span>
       <span
@@ -137,6 +142,8 @@ export const ReportCanvas = forwardRef<HTMLDivElement, { data: ReportData }>(
   function ReportCanvas({ data }, ref) {
     const { kind, daily, monthly } = data
     const isDaily = kind === 'daily'
+    // The month report carries insights as well, so it runs on a tighter rhythm.
+    const tight = !isDaily
     const tone = TONE_STYLE[monthly.status.tone]
     const hasTarget = monthly.monthlyTarget > 0
 
@@ -153,6 +160,22 @@ export const ReportCanvas = forwardRef<HTMLDivElement, { data: ReportData }>(
     const food = isDaily ? daily.food : monthly.food
     const expenses = isDaily ? daily.expenses : monthly.mtdExpenses
     const achievementPct = Math.min(100, monthly.achievement ?? 0)
+
+    /*
+     * Only the month report carries insights; the daily one already covers the
+     * same ground in full. Day-scoped statements are excluded outright — an
+     * owner opening the month report a week later should never read "today's
+     * sales are…". The pace line is dropped because the verdict above states
+     * it, and the projection because the figure beside it already does.
+     */
+    const reportInsights = isDaily
+      ? []
+      : topInsights(
+          data.insights.filter(
+            (i) => i.scope === 'month' && i.id !== 'pace' && i.id !== 'projection',
+          ),
+          2,
+        )
 
     return (
       <div
@@ -209,11 +232,11 @@ export const ReportCanvas = forwardRef<HTMLDivElement, { data: ReportData }>(
           </div>
 
           {/* --- hero --- */}
-          <div style={{ textAlign: 'center', marginTop: 18 }}>
+          <div style={{ textAlign: 'center', marginTop: tight ? 14 : 18 }}>
             <p style={{ fontSize: 22, color: '#8d837c', margin: 0, fontWeight: 600 }}>{heroLabel}</p>
             <p
               style={{
-                fontSize: 88,
+                fontSize: tight ? 80 : 88,
                 fontWeight: 800,
                 letterSpacing: -3,
                 margin: '4px 0 0',
@@ -230,8 +253,8 @@ export const ReportCanvas = forwardRef<HTMLDivElement, { data: ReportData }>(
             style={{
               display: 'flex',
               gap: 22,
-              marginTop: 18,
-              padding: '17px 26px',
+              marginTop: tight ? 14 : 18,
+              padding: tight ? '14px 26px' : '17px 26px',
               background: '#faf7f3',
               border: '1px solid #eee7de',
               borderRadius: 18,
@@ -246,7 +269,7 @@ export const ReportCanvas = forwardRef<HTMLDivElement, { data: ReportData }>(
                 />
                 <StatCell
                   label="vs Target"
-                  value={hasTarget ? formatSignedCurrency(daily.variance) : '—'}
+                  value={hasTarget ? formatSignedCurrencyWithPercent(daily.variance, daily.baseDailyTarget) : '—'}
                   color={daily.variance >= 0 ? '#0d6b3d' : '#a4162e'}
                 />
               </>
@@ -267,7 +290,7 @@ export const ReportCanvas = forwardRef<HTMLDivElement, { data: ReportData }>(
           </div>
 
           {/* --- breakdown --- */}
-          <div style={{ marginTop: 16 }}>
+          <div style={{ marginTop: tight ? 12 : 16 }}>
             <SectionLabel>{isDaily ? 'Sales Channels' : 'Channels This Month'}</SectionLabel>
             <div style={{ marginTop: 12 }}>
               <Bar
@@ -284,18 +307,21 @@ export const ReportCanvas = forwardRef<HTMLDivElement, { data: ReportData }>(
                   value={channels.direct}
                   share={channels.directShare}
                   color={CHANNEL_COLORS.direct}
+                  compact={tight}
                 />
                 <MeterRow
                   label="Swiggy"
                   value={channels.swiggy}
                   share={channels.swiggyShare}
                   color={CHANNEL_COLORS.swiggy}
+                  compact={tight}
                 />
                 <MeterRow
                   label="Zomato"
                   value={channels.zomato}
                   share={channels.zomatoShare}
                   color={CHANNEL_COLORS.zomato}
+                  compact={tight}
                 />
               </div>
             </div>
@@ -306,7 +332,7 @@ export const ReportCanvas = forwardRef<HTMLDivElement, { data: ReportData }>(
               <div style={{ marginTop: 10 }}>
                 <Rule />
               </div>
-              <div style={{ display: 'flex', gap: 28, marginTop: 14, alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', gap: 28, marginTop: tight ? 10 : 14, alignItems: 'flex-start' }}>
                 {food.recorded && (
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <SectionLabel>Veg / Non-Veg</SectionLabel>
@@ -323,12 +349,14 @@ export const ReportCanvas = forwardRef<HTMLDivElement, { data: ReportData }>(
                         value={food.veg}
                         share={food.vegShare}
                         color={FOOD_COLORS.veg}
+                        compact={tight}
                       />
                       <MeterRow
                         label="Non-Veg"
                         value={food.nonVeg}
                         share={food.nonVegShare}
                         color={FOOD_COLORS.nonVeg}
+                        compact={tight}
                       />
                     </div>
                   </div>
@@ -364,7 +392,7 @@ export const ReportCanvas = forwardRef<HTMLDivElement, { data: ReportData }>(
               borderRadius: 18,
               border: '1px solid #eee7de',
               background: '#faf7f3',
-              padding: '15px 26px',
+              padding: tight ? '13px 26px' : '15px 26px',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
@@ -443,40 +471,90 @@ export const ReportCanvas = forwardRef<HTMLDivElement, { data: ReportData }>(
             )}
           </div>
 
-          {/* --- verdict --- */}
+          {/* --- verdict, and on a month report what it means --- */}
           <div
             style={{
-              marginTop: 14,
+              marginTop: tight ? 11 : 14,
               borderRadius: 16,
               border: `1px solid ${tone.border}`,
               background: tone.bg,
               padding: '13px 22px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 14,
             }}
           >
-            <span style={{ fontSize: 34, lineHeight: 1 }}>{monthly.status.emoji}</span>
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <p style={{ margin: 0, fontSize: 27, fontWeight: 800, color: tone.text }}>
-                {monthly.status.label}
-              </p>
-              <p
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <span style={{ fontSize: 34, lineHeight: 1 }}>{monthly.status.emoji}</span>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <p style={{ margin: 0, fontSize: 27, fontWeight: 800, color: tone.text }}>
+                  {monthly.status.label}
+                </p>
+                <p
+                  style={{
+                    margin: '3px 0 0',
+                    fontSize: 19,
+                    color: tone.text,
+                    opacity: 0.88,
+                    lineHeight: 1.35,
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {monthly.status.detail}
+                </p>
+              </div>
+            </div>
+
+            {reportInsights.length > 0 && (
+              <ul
                 style={{
-                  margin: '3px 0 0',
-                  fontSize: 19,
-                  color: tone.text,
-                  opacity: 0.88,
-                  lineHeight: 1.35,
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
+                  listStyle: 'none',
+                  margin: '9px 0 0',
+                  padding: '9px 0 0',
+                  borderTop: `1px solid ${tone.border}`,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 5,
                 }}
               >
-                {monthly.status.detail}
-              </p>
-            </div>
+                {reportInsights.map((insight) => (
+                  <li
+                    key={insight.id}
+                    style={{
+                      display: 'flex',
+                      gap: 10,
+                      alignItems: 'flex-start',
+                      fontSize: 18,
+                      lineHeight: 1.3,
+                      color: tone.text,
+                      opacity: 0.9,
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: 99,
+                        background: tone.text,
+                        opacity: 0.55,
+                        marginTop: 8,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span
+                      style={{
+                        display: '-webkit-box',
+                        WebkitLineClamp: 1,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {insight.text}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
 
@@ -492,7 +570,7 @@ export const ReportCanvas = forwardRef<HTMLDivElement, { data: ReportData }>(
             justifyContent: 'space-between',
           }}
         >
-          <div>
+          <div style={{ minWidth: 0 }}>
             <p style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: 0.4 }}>
               {HOTEL.name.toUpperCase()}
             </p>
@@ -500,9 +578,15 @@ export const ReportCanvas = forwardRef<HTMLDivElement, { data: ReportData }>(
               {HOTEL.addressLine2} · {HOTEL.phone}
             </p>
           </div>
-          <p style={{ margin: 0, fontSize: 18, color: '#b0a69d', textAlign: 'right' }}>
-            Generated {formatLongDate(data.generatedAt ? toKey(data.generatedAt) : daily.date)}
-          </p>
+          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <p style={{ margin: 0, fontSize: 19, fontWeight: 800, color: '#3b322d' }}>
+              Generated &amp; curated by {REPORT_SIGNATURE.name}
+            </p>
+            <p style={{ margin: '3px 0 0', fontSize: 18, color: '#9a8f87' }}>
+              {REPORT_SIGNATURE.role} ·{' '}
+              {formatLongDate(data.generatedAt ? toKey(data.generatedAt) : daily.date)}
+            </p>
+          </div>
         </div>
       </div>
     )

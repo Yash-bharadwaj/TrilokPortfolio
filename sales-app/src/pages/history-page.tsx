@@ -10,7 +10,7 @@ import { useSales } from '@/providers/sales-provider'
 import { useReportSheet } from '@/hooks/useReport'
 import { useMonthlyMetrics } from '@/hooks/useMetrics'
 import { totalSalesOf } from '@/calculations/config'
-import { formatCurrency, formatSignedCurrency } from '@/lib/format'
+import { formatCurrency, formatSignedCurrencyWithPercent } from '@/lib/format'
 import { formatDayLabel, formatMonthLabel } from '@/lib/date'
 import { cn } from '@/lib/utils'
 
@@ -76,7 +76,7 @@ export function HistoryPage() {
                             variance >= 0 ? 'text-leaf-600' : 'text-brand-600',
                           )}
                         >
-                          {formatSignedCurrency(variance)} vs target
+                          {formatSignedCurrencyWithPercent(variance, target)} vs target
                         </p>
                       )}
                       {entry.note && (

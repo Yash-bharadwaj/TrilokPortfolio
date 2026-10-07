@@ -11,6 +11,7 @@ import { useSales } from '@/providers/sales-provider'
 import { HOTEL, SALES_MODEL_NOTE } from '@/calculations/config'
 import { useMonthlyMetrics } from '@/hooks/useMetrics'
 import { buildMonthCsv, downloadCsv, monthCsvFileName } from '@/lib/csv'
+import { RangeExport } from '@/components/dashboard/range-export'
 import { formatMonthLabel } from '@/lib/date'
 
 export function SettingsPage() {
@@ -74,11 +75,10 @@ export function SettingsPage() {
         <CardHeader>
           <CardTitle>Download for accounts</CardTitle>
           <CardDescription>
-            Every day of {formatMonthLabel(monthKey)} as a spreadsheet, with a totals row.
-            Opens in Excel.
+            Spreadsheets with a totals row, for whoever does the books. Opens in Excel.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <Button
             variant="outline"
             className="w-full"
@@ -86,8 +86,13 @@ export function SettingsPage() {
             disabled={loading}
           >
             <DownloadIcon className="size-4" />
-            {loading ? 'Loading…' : `Download ${formatMonthLabel(monthKey)} (CSV)`}
+            {loading ? 'Loading…' : `Download all of ${formatMonthLabel(monthKey)} (CSV)`}
           </Button>
+
+          <div className="border-t border-border pt-4">
+            <p className="mb-3 text-sm font-semibold">Or choose your own dates</p>
+            <RangeExport />
+          </div>
         </CardContent>
       </Card>
 

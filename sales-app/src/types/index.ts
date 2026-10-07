@@ -110,6 +110,12 @@ export interface Insight {
   id: string
   text: string
   tone: 'positive' | 'negative' | 'neutral'
+  /**
+   * Whether the statement is about the single day or about the month. A month
+   * report must never carry "today's sales are…", which would read as nonsense
+   * to an owner opening it a week later.
+   */
+  scope: 'day' | 'month'
 }
 
 export type ReportKind = 'daily' | 'mtd'

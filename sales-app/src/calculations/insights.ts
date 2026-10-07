@@ -9,8 +9,12 @@ import { totalSalesOf } from './config'
  */
 export function generateInsights(daily: DailyMetrics, monthly: MonthlyMetrics): Insight[] {
   const out: Insight[] = []
-  const push = (id: string, text: string, tone: Insight['tone'] = 'neutral') =>
-    out.push({ id, text, tone })
+  const push = (
+    scope: Insight['scope'],
+    id: string,
+    text: string,
+    tone: Insight['tone'] = 'neutral',
+  ) => out.push({ id, text, tone, scope })
 
   const hasDay = daily.entry !== null
 
@@ -18,11 +22,11 @@ export function generateInsights(daily: DailyMetrics, monthly: MonthlyMetrics): 
   if (hasDay && monthly.monthlyTarget > 0) {
     const v = daily.variance
     if (Math.abs(Math.round(v)) === 0) {
-      push('daily-variance', 'Today landed exactly on the daily target.', 'neutral')
+      push('day', 'daily-variance', 'Today landed exactly on the daily target.', 'neutral')
     } else if (v > 0) {
-      push('daily-variance', `Today's sales are ${formatCurrency(v)} above the daily target.`, 'positive')
+      push('day', 'daily-variance', `Today's sales are ${formatCurrency(v)} above the daily target.`, 'positive')
     } else {
-      push('daily-variance', `Today's sales are ${formatCurrency(-v)} below the daily target.`, 'negative')
+      push('day', 'daily-variance', `Today's sales are ${formatCurrency(-v)} below the daily target.`, 'negative')
     }
   }
 
@@ -30,15 +34,14 @@ export function generateInsights(daily: DailyMetrics, monthly: MonthlyMetrics): 
   if (hasDay && daily.totalSales > 0) {
     const { swiggyShare, zomatoShare, swiggy, zomato } = daily.channels
     if (swiggy > 0) {
-      push('swiggy-share', `Swiggy contributed ${formatPercent(swiggyShare)} of today's sales.`)
+      push('day', 'swiggy-share', `Swiggy contributed ${formatPercent(swiggyShare)} of today's sales.`)
     }
     if (zomato > 0) {
-      push('zomato-share', `Zomato contributed ${formatPercent(zomatoShare)} of today's sales.`)
+      push('day', 'zomato-share', `Zomato contributed ${formatPercent(zomatoShare)} of today's sales.`)
     }
     const online = swiggyShare + zomatoShare
     if (online > 0) {
-      push(
-        'online-share',
+      push('day', 'online-share',
         `Online aggregators made up ${formatPercent(online)} of today's sales; the rest was direct.`,
         online > 35 ? 'negative' : 'neutral',
       )
@@ -53,8 +56,7 @@ export function generateInsights(daily: DailyMetrics, monthly: MonthlyMetrics): 
     const delta = daily.totalSales - prevTotal
     if (prevTotal > 0 && Math.round(Math.abs(delta)) > 0) {
       const pct = (delta / prevTotal) * 100
-      push(
-        'dod',
+      push('day', 'dod',
         delta > 0
           ? `Sales rose ${formatCurrency(delta)} (${formatPercent(pct)}) against ${formatShortDate(previous.date)}.`
           : `Sales fell ${formatCurrency(-delta)} (${formatPercent(-pct)}) against ${formatShortDate(previous.date)}.`,
@@ -64,8 +66,7 @@ export function generateInsights(daily: DailyMetrics, monthly: MonthlyMetrics): 
     if (previous.zomatoSales > 0 || daily.channels.zomato > 0) {
       const zd = daily.channels.zomato - previous.zomatoSales
       if (Math.round(Math.abs(zd)) > 0) {
-        push(
-          'zomato-dod',
+        push('day', 'zomato-dod',
           zd > 0
             ? `Zomato sales increased ${formatCurrency(zd)} compared with the previous recorded day.`
             : `Zomato sales decreased ${formatCurrency(-zd)} compared with the previous recorded day.`,
@@ -79,11 +80,11 @@ export function generateInsights(daily: DailyMetrics, monthly: MonthlyMetrics): 
   if (monthly.monthlyTarget > 0 && monthly.expectedToDate > 0) {
     const pct = (monthly.status.paceVariance / monthly.expectedToDate) * 100
     if (monthly.status.tone === 'ahead') {
-      push('pace', `You are ${formatPercent(pct)} ahead of the expected monthly pace.`, 'positive')
+      push('month', 'pace', `You are ${formatPercent(pct)} ahead of the expected monthly pace.`, 'positive')
     } else if (monthly.status.tone === 'behind') {
-      push('pace', `You are ${formatPercent(-pct)} behind the expected monthly pace.`, 'negative')
+      push('month', 'pace', `You are ${formatPercent(-pct)} behind the expected monthly pace.`, 'negative')
     } else {
-      push('pace', 'Month-to-date sales are tracking the monthly target pace.', 'neutral')
+      push('month', 'pace', 'Month-to-date sales are tracking the monthly target pace.', 'neutral')
     }
   }
 
@@ -91,8 +92,7 @@ export function generateInsights(daily: DailyMetrics, monthly: MonthlyMetrics): 
   if (monthly.averageDailySales !== null && monthly.requiredDailyPace !== null) {
     const gap = monthly.averageDailySales - monthly.requiredDailyPace
     if (Math.round(Math.abs(gap)) > 0) {
-      push(
-        'pace-gap',
+      push('month', 'pace-gap',
         gap > 0
           ? `Average daily sales are ${formatCurrency(gap)} above the pace still required.`
           : `Average daily sales need to rise by ${formatCurrency(-gap)} to hit the monthly target.`,
@@ -106,6 +106,7 @@ export function generateInsights(daily: DailyMetrics, monthly: MonthlyMetrics): 
   if (food) {
     const scope = hasDay && daily.food.recorded ? 'today' : 'this month'
     push(
+      scope === 'today' ? 'day' : 'month',
       'food-mix',
       `Non-Veg contributed ${formatPercent(food.nonVegShare)} and Veg ${formatPercent(
         food.vegShare,
@@ -116,8 +117,7 @@ export function generateInsights(daily: DailyMetrics, monthly: MonthlyMetrics): 
   // --- best day ------------------------------------------------------------
   if (monthly.entries.length >= 3) {
     const best = monthly.entries.reduce((a, b) => (totalSalesOf(b) > totalSalesOf(a) ? b : a))
-    push(
-      'best-day',
+    push('month', 'best-day',
       `Best day so far is ${formatShortDate(best.date)} at ${formatCurrency(totalSalesOf(best))}.`,
       'positive',
     )
@@ -126,8 +126,7 @@ export function generateInsights(daily: DailyMetrics, monthly: MonthlyMetrics): 
   // --- expenses ------------------------------------------------------------
   if (monthly.mtdExpenses > 0 && monthly.mtdSales > 0) {
     const ratio = (monthly.mtdExpenses / monthly.mtdSales) * 100
-    push(
-      'expense-ratio',
+    push('month', 'expense-ratio',
       `Expenses are ${formatPercent(ratio)} of month-to-date sales, leaving ${formatCurrency(
         monthly.mtdSalesAfterExpenses,
       )} after expenses.`,
@@ -139,8 +138,7 @@ export function generateInsights(daily: DailyMetrics, monthly: MonthlyMetrics): 
   if (monthly.projection.projected !== null && monthly.projection.varianceToTarget !== null) {
     const v = monthly.projection.varianceToTarget
     const hedge = monthly.projection.lowConfidence ? ' (early estimate from limited data)' : ''
-    push(
-      'projection',
+    push('month', 'projection',
       v >= 0
         ? `At the current average, the month is projected to beat the target by ${formatCurrency(v)}${hedge}.`
         : `At the current average, the month is projected to fall short by ${formatCurrency(-v)}${hedge}.`,

@@ -5,7 +5,8 @@ import type { MonthSnapshot, SalesRepository } from '@/services/repository'
 import { emptySettings } from '@/services/repository'
 import { flushOutbox, withOutbox } from '@/services/outboxRepository'
 import { listPending, OUTBOX_EVENT } from '@/services/outbox'
-import { shiftMonth } from '@/lib/date'
+import { monthsBetween, shiftMonth } from '@/lib/date'
+import { sortEntries } from '@/services/repository'
 import type { DailySales, MonthSettings } from '@/types'
 import { currentMonthKey, monthKeyOfDay } from '@/lib/date'
 import { friendlyError } from '@/lib/errors'
@@ -25,6 +26,11 @@ interface SalesState {
   entryFor: (date: string) => DailySales | null
   /** Previous month's totals, fetched once for the comparison. */
   previousMonth: MonthSnapshot | null
+  /** One-off read of any day range, for exporting. Crosses months freely. */
+  fetchRange: (
+    from: string,
+    to: string,
+  ) => Promise<{ entries: DailySales[]; monthlyTargets: Record<string, number> }>
   /** Writes saved on the device but not yet confirmed by the server. */
   pendingWrites: number
   /**
@@ -185,6 +191,22 @@ export function SalesProvider({ children }: { children: React.ReactNode }) {
     [entries],
   )
 
+  const fetchRange = React.useCallback(
+    async (from: string, to: string) => {
+      if (!repository) throw new Error('Still starting up. Please try again in a moment.')
+      const months = monthsBetween(from, to)
+      const snapshots = await Promise.all(months.map((m) => repository.getMonthSnapshot(m)))
+      const entries = sortEntries(
+        snapshots.flatMap((s) => s.entries).filter((e) => e.date >= from && e.date <= to),
+      )
+      const monthlyTargets = Object.fromEntries(
+        snapshots.map((s) => [s.monthKey, s.settings.monthlyTarget]),
+      )
+      return { entries, monthlyTargets }
+    },
+    [repository],
+  )
+
   const saveDay = React.useCallback(
     async (entry: DailySales) => {
       if (!repository) throw new Error('Still starting up. Please try again in a moment.')
@@ -226,6 +248,7 @@ export function SalesProvider({ children }: { children: React.ReactNode }) {
       previousMonth,
       pendingWrites,
       hasServerData,
+      fetchRange,
       saveDay,
       deleteDay,
       saveMonthlyTarget,
@@ -244,6 +267,7 @@ export function SalesProvider({ children }: { children: React.ReactNode }) {
       previousMonth,
       pendingWrites,
       hasServerData,
+      fetchRange,
       saveDay,
       deleteDay,
       saveMonthlyTarget,

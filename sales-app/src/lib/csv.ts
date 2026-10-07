@@ -1,6 +1,12 @@
-import type { MonthlyMetrics } from '@/types'
+import type { DailySales, MonthlyMetrics } from '@/types'
 import { DIRECT_LABEL, directSalesOf, totalSalesOf, HOTEL } from '@/calculations/config'
-import { formatShortDate, formatMonthLabel } from '@/lib/date'
+import {
+  daysInMonthOf,
+  formatMonthLabel,
+  formatRangeLabel,
+  formatShortDate,
+  monthKeyOfDay,
+} from '@/lib/date'
 
 /**
  * A spreadsheet of the month, for whoever does the books.
@@ -8,69 +14,116 @@ import { formatShortDate, formatMonthLabel } from '@/lib/date'
  * Values are written as plain numbers with no ₹ or thousands separators, so
  * Excel reads them as numbers rather than text. A totals row closes the sheet.
  */
-export function buildMonthCsv(monthly: MonthlyMetrics): string {
-  const header = [
-    'Date',
-    'Day',
-    'Total Sales',
-    DIRECT_LABEL,
-    'Swiggy',
-    'Zomato',
-    'Veg',
-    'Non-Veg',
-    'Expenses',
-    'Sales After Expenses',
-    'Daily Target',
-    'vs Target',
-    'Note',
-  ]
+const HEADER = [
+  'Date',
+  'Day',
+  'Total Sales',
+  DIRECT_LABEL,
+  'Swiggy',
+  'Zomato',
+  'Veg',
+  'Non-Veg',
+  'Expenses',
+  'Sales After Expenses',
+  'Daily Target',
+  'vs Target',
+  'Note',
+]
 
-  const escape = (value: string) =>
-    /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value
+function escape(value: string): string {
+  return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value
+}
 
-  const rows = monthly.entries.map((entry) => {
-    const total = totalSalesOf(entry)
-    return [
-      entry.date,
-      formatShortDate(entry.date),
-      String(total),
-      String(Math.max(0, directSalesOf(entry))),
-      String(entry.swiggySales),
-      String(entry.zomatoSales),
-      String(entry.vegSales),
-      String(entry.nonVegSales),
-      String(entry.expenses),
-      String(total - entry.expenses),
-      monthly.baseDailyTarget.toFixed(2),
-      (total - monthly.baseDailyTarget).toFixed(2),
-      escape(entry.note ?? ''),
-    ].join(',')
-  })
+function row(entry: DailySales, dailyTarget: number): string {
+  const total = totalSalesOf(entry)
+  return [
+    entry.date,
+    formatShortDate(entry.date),
+    String(total),
+    String(Math.max(0, directSalesOf(entry))),
+    String(entry.swiggySales),
+    String(entry.zomatoSales),
+    String(entry.vegSales),
+    String(entry.nonVegSales),
+    String(entry.expenses),
+    String(total - entry.expenses),
+    dailyTarget > 0 ? dailyTarget.toFixed(2) : '',
+    dailyTarget > 0 ? (total - dailyTarget).toFixed(2) : '',
+    escape(entry.note ?? ''),
+  ].join(',')
+}
+
+function sum(entries: DailySales[], pick: (e: DailySales) => number): number {
+  return entries.reduce((acc, e) => acc + pick(e), 0)
+}
+
+/**
+ * Shared sheet builder. Values are plain numbers with no ₹ or separators, so
+ * Excel reads them as numbers rather than text, and a totals row closes it.
+ */
+function buildCsv(
+  title: string,
+  entries: DailySales[],
+  dailyTargetFor: (entry: DailySales) => number,
+  targetTotal: number | null,
+): string {
+  const rows = entries.map((entry) => row(entry, dailyTargetFor(entry)))
+  const grandTotal = sum(entries, totalSalesOf)
+  const expenses = sum(entries, (e) => e.expenses)
 
   const totals = [
     'TOTAL',
-    `${monthly.daysRecorded} days`,
-    String(monthly.mtdSales),
-    String(monthly.channels.direct),
-    String(monthly.channels.swiggy),
-    String(monthly.channels.zomato),
-    String(monthly.food.veg),
-    String(monthly.food.nonVeg),
-    String(monthly.mtdExpenses),
-    String(monthly.mtdSalesAfterExpenses),
-    String(monthly.monthlyTarget),
-    (monthly.mtdSales - monthly.monthlyTarget).toFixed(2),
+    `${entries.length} ${entries.length === 1 ? 'day' : 'days'}`,
+    String(grandTotal),
+    String(sum(entries, (e) => Math.max(0, directSalesOf(e)))),
+    String(sum(entries, (e) => e.swiggySales)),
+    String(sum(entries, (e) => e.zomatoSales)),
+    String(sum(entries, (e) => e.vegSales)),
+    String(sum(entries, (e) => e.nonVegSales)),
+    String(expenses),
+    String(grandTotal - expenses),
+    targetTotal === null ? '' : String(targetTotal),
+    targetTotal === null ? '' : (grandTotal - targetTotal).toFixed(2),
     '',
   ].join(',')
 
-  return [
+  return [title, '', HEADER.join(','), ...rows, '', totals].join('\n')
+}
+
+export function buildMonthCsv(monthly: MonthlyMetrics): string {
+  return buildCsv(
     `${HOTEL.name} — ${formatMonthLabel(monthly.monthKey)} sales`,
-    '',
-    header.join(','),
-    ...rows,
-    '',
-    totals,
-  ].join('\n')
+    monthly.entries,
+    () => monthly.baseDailyTarget,
+    monthly.monthlyTarget,
+  )
+}
+
+/**
+ * A range that may cross month boundaries, so each day is measured against the
+ * target of its own month rather than one blanket figure.
+ */
+export function buildRangeCsv(
+  entries: DailySales[],
+  monthlyTargets: Record<string, number>,
+  from: string,
+  to: string,
+): string {
+  const dailyTargetFor = (entry: DailySales) => {
+    const monthKey = monthKeyOfDay(entry.date)
+    const target = monthlyTargets[monthKey] ?? 0
+    return target > 0 ? target / daysInMonthOf(monthKey) : 0
+  }
+  return buildCsv(
+    `${HOTEL.name} — sales ${formatRangeLabel(from, to)}`,
+    entries,
+    dailyTargetFor,
+    null,
+  )
+}
+
+export function rangeCsvFileName(from: string, to: string): string {
+  return `${HOTEL.name.replace(/\s+/g, '-')}-Sales-${from}_to_${to}.csv`
 }
 
 export function monthCsvFileName(monthKey: string): string {

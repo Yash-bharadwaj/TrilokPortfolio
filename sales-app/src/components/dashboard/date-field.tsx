@@ -11,10 +11,16 @@ export function DateField({
   value,
   onChange,
   id,
+  min,
+  max,
 }: {
   value: string
   onChange: (next: string) => void
   id?: string
+  /** Earliest selectable day. */
+  min?: string
+  /** Latest selectable day. Never later than today. */
+  max?: string
 }) {
   const [open, setOpen] = React.useState(false)
   const isToday = value === todayKey()
@@ -43,7 +49,12 @@ export function DateField({
           autoFocus
           selected={fromDayKey(value)}
           defaultMonth={fromDayKey(value)}
-          disabled={{ after: new Date() }}
+          // Out-of-range days are simply unpickable, so an invalid range cannot
+          // be produced in the first place.
+          disabled={[
+            { after: max ? fromDayKey(max) : new Date() },
+            ...(min ? [{ before: fromDayKey(min) }] : []),
+          ]}
           onSelect={(date) => {
             if (!date) return
             onChange(toDayKey(date))

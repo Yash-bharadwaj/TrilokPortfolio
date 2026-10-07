@@ -87,6 +87,15 @@ export const PACE_TOLERANCE = 0.02
 /** A projection from one or two days of trading is not worth presenting as fact. */
 export const MIN_DAYS_FOR_CONFIDENT_PROJECTION = 3
 
+/**
+ * Who the report comes from. Shown on every generated image, so the owner can
+ * see at a glance who prepared it. One place to change if the GM changes.
+ */
+export const REPORT_SIGNATURE = {
+  name: 'Trilok',
+  role: 'General Manager',
+} as const
+
 export const HOTEL = {
   name: 'Sai Brundavan Grand',
   addressLine1: 'Integrated Market, 2-77, Parupalli Veedhi',

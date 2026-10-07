@@ -58,10 +58,21 @@ export function DashboardPage() {
   // away: enter → save → send, without hunting for a button.
   const shareDate = params.get('share')
   const { show } = report
+  const sharedRef = React.useRef<string | null>(null)
   React.useEffect(() => {
-    if (!shareDate || loading) return
-    if (entries.some((e) => e.date === shareDate)) show('daily', shareDate)
-    setParams({}, { replace: true })
+    if (!shareDate || sharedRef.current === shareDate || loading) return
+
+    if (entries.some((e) => e.date === shareDate)) {
+      sharedRef.current = shareDate
+      show('daily', shareDate)
+      setParams({}, { replace: true })
+      return
+    }
+
+    // The day may not have reached us yet. Wait for it rather than dropping the
+    // hand-off, but do not leave the parameter sitting in the URL for ever.
+    const timer = window.setTimeout(() => setParams({}, { replace: true }), 8000)
+    return () => window.clearTimeout(timer)
   }, [shareDate, loading, entries, show, setParams])
 
   const hasTarget = settings.monthlyTarget > 0
@@ -128,7 +139,6 @@ export function DashboardPage() {
       {/* The two actions this app exists for, side by side and always reachable. */}
       <div className="grid grid-cols-2 gap-2.5">
         <Button
-          size="lg"
           variant="outline"
           onClick={() => reportDate && report.show('daily', reportDate)}
           disabled={!reportDate}
@@ -136,11 +146,7 @@ export function DashboardPage() {
           <Share2Icon className="size-4" />
           Share day
         </Button>
-        <Button
-          size="lg"
-          onClick={() => report.show('mtd', monthly.asOf)}
-          disabled={entries.length === 0}
-        >
+        <Button onClick={() => report.show('mtd', monthly.asOf)} disabled={entries.length === 0}>
           <CalendarRangeIcon className="size-4" />
           Share month
         </Button>

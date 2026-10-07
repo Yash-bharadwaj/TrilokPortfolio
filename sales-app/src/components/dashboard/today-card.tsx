@@ -3,7 +3,7 @@ import { PencilIcon, PlusIcon } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Stat } from './stat'
-import { formatCurrency, formatSignedCurrency } from '@/lib/format'
+import { formatCurrency, formatSignedCurrencyWithPercent } from '@/lib/format'
 import { formatLongDate, todayKey } from '@/lib/date'
 import { DIRECT_LABEL } from '@/calculations/config'
 import type { DailyMetrics } from '@/types'
@@ -20,9 +20,9 @@ export function TodayCard({ daily, hasTarget }: { daily: DailyMetrics; hasTarget
           {heading}
         </p>
         <p className="mt-2 text-sm text-muted-foreground">No sales entered yet.</p>
-        <Button asChild size="lg" className="mt-3 w-full">
+        <Button asChild className="mt-3 w-full">
           <Link to={`/add?date=${daily.date}`}>
-            <PlusIcon className="size-5" />
+            <PlusIcon className="size-4" />
             Enter {isToday ? "today's" : "that day's"} sales
           </Link>
         </Button>
@@ -47,7 +47,7 @@ export function TodayCard({ daily, hasTarget }: { daily: DailyMetrics; hasTarget
               <span
                 className={ahead ? 'tnum font-bold text-leaf-600' : 'tnum font-bold text-brand-600'}
               >
-                {formatSignedCurrency(daily.variance)}
+                {formatSignedCurrencyWithPercent(daily.variance, daily.baseDailyTarget)}
               </span>{' '}
               <span className="text-muted-foreground">
                 vs {formatCurrency(daily.baseDailyTarget)} target

@@ -26,7 +26,7 @@ import { useSales } from '@/providers/sales-provider'
 import { collectSoftWarnings, dailySalesSchema, type DailySalesValues } from '@/schemas/sales'
 import { daysInMonthOf, formatLongDate, monthKeyOfDay, todayKey } from '@/lib/date'
 import { NET_HINT, NET_LABEL, totalSalesOf } from '@/calculations/config'
-import { formatCurrency, formatSignedCurrency } from '@/lib/format'
+import { formatCurrency, formatSignedCurrencyWithPercent } from '@/lib/format'
 import { friendlyError } from '@/lib/errors'
 import { cn } from '@/lib/utils'
 
@@ -303,7 +303,7 @@ export function AddSalesPage() {
                   dayTotal >= dailyTarget ? 'font-semibold text-leaf-600' : 'font-semibold text-brand-600'
                 }
               >
-                {formatSignedCurrency(dayTotal - dailyTarget)}
+                {formatSignedCurrencyWithPercent(dayTotal - dailyTarget, dailyTarget)}
               </span>{' '}
               vs today's target of {formatCurrency(dailyTarget)}
             </p>

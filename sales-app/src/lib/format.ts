@@ -29,6 +29,29 @@ export function formatSignedCurrency(value: number | null | undefined): string {
   return `${sign}₹${inr.format(Math.abs(rounded))}`
 }
 
+/**
+ * `+₹3,444 (+7.1%)` — the gap, and how big it is relative to what was expected.
+ * The percentage is dropped when there is no meaningful base to compare against.
+ */
+export function formatSignedCurrencyWithPercent(
+  value: number | null | undefined,
+  base: number | null | undefined,
+): string {
+  const amount = formatSignedCurrency(value)
+  if (
+    amount === '—' ||
+    base === null ||
+    base === undefined ||
+    !Number.isFinite(base) ||
+    base <= 0 ||
+    value === null ||
+    value === undefined
+  ) {
+    return amount
+  }
+  return `${amount} (${formatSignedPercent((value / base) * 100)})`
+}
+
 export function formatNumber(value: number): string {
   return inr.format(value)
 }
