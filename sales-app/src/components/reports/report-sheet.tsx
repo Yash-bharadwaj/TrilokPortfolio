@@ -3,7 +3,7 @@ import { DownloadIcon, Share2Icon, LoaderIcon, AlertCircleIcon } from 'lucide-re
 import { toast } from 'sonner'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
-import { ReportCanvas, REPORT_HEIGHT, REPORT_WIDTH } from './report-canvas'
+import { ReportCanvas, REPORT_WIDTH } from './report-canvas'
 import { canShareFiles, captureReport, downloadBlob, reportFileName, shareOrDownload } from '@/lib/report-image'
 import { HOTEL } from '@/calculations/config'
 import type { ReportData } from '@/types'
@@ -106,7 +106,8 @@ export function ReportSheet({
             top: 0,
             left: -20000,
             width: REPORT_WIDTH,
-            height: REPORT_HEIGHT,
+            // Height is left to the content: the month report is as tall as its
+            // table needs, and the capture measures it.
             pointerEvents: 'none',
             opacity: 1,
             zIndex: -1,

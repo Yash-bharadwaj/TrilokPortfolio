@@ -9,11 +9,13 @@ import {
 } from '@/lib/format'
 import { formatLongDate, todayKey } from '@/lib/date'
 import { DIRECT_LABEL, HOTEL, REPORT_SIGNATURE } from '@/calculations/config'
-import { topInsights } from '@/calculations/insights'
+import { MonthReport } from './month-report'
 import type { ReportData } from '@/types'
 
-export const REPORT_WIDTH = 1080
-export const REPORT_HEIGHT = 1350
+import { DAILY_REPORT_HEIGHT, REPORT_WIDTH } from './report-parts'
+
+export { REPORT_WIDTH }
+export const REPORT_HEIGHT = DAILY_REPORT_HEIGHT
 
 const TONE_STYLE = {
   ahead: { bg: '#eefaf2', border: '#9fe0bb', text: '#0d6b3d' },
@@ -167,25 +169,26 @@ function Bar({ slices, total }: { slices: { share: number; color: string }[]; to
  */
 export const ReportCanvas = forwardRef<HTMLDivElement, { data: ReportData }>(
   function ReportCanvas({ data }, ref) {
-    const { kind, daily, monthly } = data
-    const isDaily = kind === 'daily'
-    // The month report carries insights as well, so it runs on a tighter rhythm.
-    const tight = !isDaily
+    // The month report is its own layout: it carries a table of every day and
+    // so has no fixed height.
+    if (data.kind === 'mtd') {
+      return (
+        <div ref={ref} style={{ width: REPORT_WIDTH }}>
+          <MonthReport data={data} />
+        </div>
+      )
+    }
+
+    const { daily, monthly } = data
+    const tight = false
     const tone = TONE_STYLE[monthly.status.tone]
     const hasTarget = monthly.monthlyTarget > 0
 
-    const isTodayReport = isDaily && daily.date === todayKey()
-    const heroLabel = isDaily
-      ? isTodayReport
-        ? "Today's Sales"
-        : "Day's Sales"
-      : monthly.daysRemaining > 0
-        ? 'Sales So Far'
-        : 'Total Sales'
-    const heroValue = isDaily ? daily.totalSales : monthly.mtdSales
-    const channels = isDaily ? daily.channels : monthly.channels
-    const food = isDaily ? daily.food : monthly.food
-    const expenses = isDaily ? daily.expenses : monthly.mtdExpenses
+    const heroLabel = daily.date === todayKey() ? "Today's Sales" : "Day's Sales"
+    const heroValue = daily.totalSales
+    const channels = daily.channels
+    const food = daily.food
+    const expenses = daily.expenses
     const achievementPct = Math.min(100, monthly.achievement ?? 0)
 
     /*
@@ -195,14 +198,6 @@ export const ReportCanvas = forwardRef<HTMLDivElement, { data: ReportData }>(
      * sales are…". The pace line is dropped because the verdict above states
      * it, and the projection because the figure beside it already does.
      */
-    const reportInsights = isDaily
-      ? []
-      : topInsights(
-          data.insights.filter(
-            (i) => i.scope === 'month' && i.id !== 'pace' && i.id !== 'projection',
-          ),
-          2,
-        )
 
     return (
       <div
@@ -242,7 +237,7 @@ export const ReportCanvas = forwardRef<HTMLDivElement, { data: ReportData }>(
             />
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
               <span style={{ width: 40, height: 1, background: '#d8cec3' }} />
-              <SectionLabel>{isDaily ? 'Daily Sales Report' : 'Month to Date Report'}</SectionLabel>
+              <SectionLabel>Daily Sales Report</SectionLabel>
               <span style={{ width: 40, height: 1, background: '#d8cec3' }} />
             </div>
             <p
@@ -254,7 +249,7 @@ export const ReportCanvas = forwardRef<HTMLDivElement, { data: ReportData }>(
                 color: '#3b322d',
               }}
             >
-              {isDaily ? formatLongDate(daily.date) : monthly.monthLabel}
+              {formatLongDate(daily.date)}
             </p>
           </div>
 
@@ -287,8 +282,7 @@ export const ReportCanvas = forwardRef<HTMLDivElement, { data: ReportData }>(
               borderRadius: 18,
             }}
           >
-            {isDaily ? (
-              <>
+            <>
                 <StatCell label="Target" value={formatCurrency(daily.baseDailyTarget)} />
                 <StatCell
                   label="Achievement"
@@ -305,25 +299,11 @@ export const ReportCanvas = forwardRef<HTMLDivElement, { data: ReportData }>(
                   color={daily.variance >= 0 ? '#0d6b3d' : '#a4162e'}
                 />
               </>
-            ) : (
-              <>
-                <StatCell label="Target" value={formatCurrency(monthly.monthlyTarget)} />
-                <StatCell
-                  label="Achievement"
-                  value={hasTarget ? formatPercent(monthly.achievement) : '—'}
-                />
-                <StatCell
-                  label="Remaining"
-                  value={hasTarget ? formatCurrency(monthly.remaining) : '—'}
-                  color={monthly.remaining > 0 ? '#1a1614' : '#0d6b3d'}
-                />
-              </>
-            )}
           </div>
 
           {/* --- breakdown --- */}
           <div style={{ marginTop: tight ? 12 : 16 }}>
-            <SectionLabel>{isDaily ? 'Sales Channels' : 'Channels This Month'}</SectionLabel>
+            <SectionLabel>Sales Channels</SectionLabel>
             <div style={{ marginTop: 12 }}>
               <Bar
                 total={channels.total}
@@ -408,7 +388,7 @@ export const ReportCanvas = forwardRef<HTMLDivElement, { data: ReportData }>(
                     </p>
                     <p style={{ fontSize: 19, color: '#8d837c', margin: '4px 0 0', fontWeight: 600 }}>
                       Sales after expenses{' '}
-                      {formatCurrency(isDaily ? daily.salesAfterExpenses : monthly.mtdSalesAfterExpenses)}
+                      {formatCurrency(daily.salesAfterExpenses)}
                     </p>
                   </div>
                 )}
@@ -429,7 +409,7 @@ export const ReportCanvas = forwardRef<HTMLDivElement, { data: ReportData }>(
           >
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
               <SectionLabel>
-                {isDaily ? `Month to Date · ${monthly.monthLabel}` : 'Month Performance'}
+                {`Month to Date · ${monthly.monthLabel}`}
               </SectionLabel>
               <span
                 style={{
@@ -443,8 +423,7 @@ export const ReportCanvas = forwardRef<HTMLDivElement, { data: ReportData }>(
               </span>
             </div>
 
-            {isDaily ? (
-              <div style={{ display: 'flex', gap: 22, marginTop: 13 }}>
+            <div style={{ display: 'flex', gap: 22, marginTop: 13 }}>
                 <StatCell label="Sales" value={formatCurrency(monthly.mtdSales)} />
                 <StatCell label="Target" value={formatCurrency(monthly.monthlyTarget)} />
                 <StatCell
@@ -456,29 +435,6 @@ export const ReportCanvas = forwardRef<HTMLDivElement, { data: ReportData }>(
                   value={hasTarget ? formatCurrency(monthly.remaining) : '—'}
                 />
               </div>
-            ) : (
-              <div style={{ display: 'flex', gap: 26, marginTop: 16 }}>
-                <StatCell label="Average / day" value={formatCurrency(monthly.averageDailySales)} />
-                <StatCell
-                  label="Needed / day"
-                  value={
-                    monthly.requiredDailyPace === null
-                      ? '—'
-                      : formatCurrency(monthly.requiredDailyPace)
-                  }
-                />
-                <StatCell
-                  label={monthly.daysRemaining === 0 ? 'Finished at' : 'May end at'}
-                  value={
-                    monthly.daysRemaining === 0
-                      ? formatCurrency(monthly.mtdSales)
-                      : monthly.projection.projected === null
-                        ? '—'
-                        : formatCurrency(monthly.projection.projected)
-                  }
-                />
-              </div>
-            )}
 
             {hasTarget && (
               <div style={{ marginTop: 14 }}>
@@ -537,56 +493,6 @@ export const ReportCanvas = forwardRef<HTMLDivElement, { data: ReportData }>(
               </div>
             </div>
 
-            {reportInsights.length > 0 && (
-              <ul
-                style={{
-                  listStyle: 'none',
-                  margin: '9px 0 0',
-                  padding: '9px 0 0',
-                  borderTop: `1px solid ${tone.border}`,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 5,
-                }}
-              >
-                {reportInsights.map((insight) => (
-                  <li
-                    key={insight.id}
-                    style={{
-                      display: 'flex',
-                      gap: 10,
-                      alignItems: 'flex-start',
-                      fontSize: 18,
-                      lineHeight: 1.3,
-                      color: tone.text,
-                      opacity: 0.9,
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: 99,
-                        background: tone.text,
-                        opacity: 0.55,
-                        marginTop: 8,
-                        flexShrink: 0,
-                      }}
-                    />
-                    <span
-                      style={{
-                        display: '-webkit-box',
-                        WebkitLineClamp: 1,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                      }}
-                    >
-                      {insight.text}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
           </div>
         </div>
 

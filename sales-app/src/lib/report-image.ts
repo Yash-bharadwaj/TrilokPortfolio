@@ -1,4 +1,4 @@
-import { REPORT_HEIGHT, REPORT_WIDTH } from '@/components/reports/report-canvas'
+import { REPORT_WIDTH } from '@/components/reports/report-parts'
 import { HOTEL } from '@/calculations/config'
 import { formatMonthLabel } from '@/lib/date'
 import type { ReportKind } from '@/types'
@@ -28,11 +28,15 @@ export async function captureReport(node: HTMLElement): Promise<Blob> {
     }
   }
 
+  // Measured rather than assumed: the daily report is a fixed card, but the
+  // month report grows with the number of days it covers.
+  const height = Math.max(node.scrollHeight, node.offsetHeight, 1)
+
   const options = {
     width: REPORT_WIDTH,
-    height: REPORT_HEIGHT,
+    height,
     canvasWidth: REPORT_WIDTH,
-    canvasHeight: REPORT_HEIGHT,
+    canvasHeight: height,
     pixelRatio: 1,
     backgroundColor: '#fffdfb',
     cacheBust: true,
