@@ -1,0 +1,1 @@
+import{R as e}from"./index-Bj2MRm6n.js";import{c as t,d as n,f as r}from"./firebase-DmjOSOlh.js";var i,a,o;function s(){return i||=r(e),i}function c(){return a||=n(s()),a}function l(){return o||=t(s(),{}),o}export{l as getDb,c as getFirebaseAuth};

@@ -1,11 +1,22 @@
 import * as React from 'react'
-import { DownloadIcon, Share2Icon, LoaderIcon, AlertCircleIcon } from 'lucide-react'
+import {
+  AlertCircleIcon,
+  FileSpreadsheetIcon,
+  FileTextIcon,
+  ImageIcon,
+  LoaderIcon,
+  Share2Icon,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { ReportCanvas, REPORT_WIDTH } from './report-canvas'
 import { canShareFiles, captureReport, downloadBlob, reportFileName, shareOrDownload } from '@/lib/report-image'
 import { HOTEL } from '@/calculations/config'
+import { buildMonthCsv, downloadCsv, monthCsvFileName } from '@/lib/csv'
+import { buildMonthPdf, monthPdfFileName } from '@/lib/report-pdf'
+import { brundavanLogoSrc } from '@/components/brand'
+import { cn } from '@/lib/utils'
 import type { ReportData } from '@/types'
 
 type Phase = 'idle' | 'generating' | 'ready' | 'error'
@@ -27,6 +38,7 @@ export function ReportSheet({
   const [phase, setPhase] = React.useState<Phase>('idle')
   const [preview, setPreview] = React.useState<string | null>(null)
   const [sharing, setSharing] = React.useState(false)
+  const [building, setBuilding] = React.useState<'pdf' | 'csv' | null>(null)
   const blobRef = React.useRef<Blob | null>(null)
 
   const fileName = data
@@ -87,6 +99,49 @@ export function ReportSheet({
     }
   }
 
+  /** The logo as a data URL, so jsPDF can embed it without a network fetch. */
+  async function logoDataUrl(): Promise<string | undefined> {
+    try {
+      const response = await fetch(brundavanLogoSrc)
+      const blob = await response.blob()
+      return await new Promise((resolve) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result))
+        reader.onerror = () => resolve(undefined as unknown as string)
+        reader.readAsDataURL(blob)
+      })
+    } catch {
+      return undefined
+    }
+  }
+
+  async function handlePdf() {
+    if (!data || building) return
+    setBuilding('pdf')
+    try {
+      const blob = await buildMonthPdf(data.monthly, await logoDataUrl())
+      downloadBlob(blob, monthPdfFileName(data.monthly.monthLabel))
+      toast.success('PDF downloaded.')
+    } catch {
+      toast.error('Could not build the PDF. Please try again.')
+    } finally {
+      setBuilding(null)
+    }
+  }
+
+  function handleCsv() {
+    if (!data) return
+    setBuilding('csv')
+    try {
+      downloadCsv(buildMonthCsv(data.monthly), monthCsvFileName(data.monthly.monthKey))
+      toast.success('Spreadsheet downloaded.')
+    } catch {
+      toast.error('Could not build the spreadsheet. Please try again.')
+    } finally {
+      setBuilding(null)
+    }
+  }
+
   function handleSave() {
     if (!blobRef.current) return
     downloadBlob(blobRef.current, fileName)
@@ -94,6 +149,7 @@ export function ReportSheet({
   }
 
   const nativeShare = canShareFiles()
+  const isMonth = data?.kind === 'mtd'
 
   return (
     <>
@@ -163,16 +219,53 @@ export function ReportSheet({
                 Send report
               </Button>
             )}
-            <Button
-              size="lg"
-              variant={nativeShare ? 'outline' : 'default'}
-              onClick={handleSave}
-              disabled={phase !== 'ready'}
-            >
-              <DownloadIcon className="size-5" />
-              Save image
-            </Button>
-            {!nativeShare && (
+
+            {/* A month can also be taken away as a document or a spreadsheet. */}
+            <div className={cn('grid gap-2', isMonth ? 'grid-cols-3' : 'grid-cols-1')}>
+              <Button
+                variant={nativeShare ? 'outline' : 'default'}
+                onClick={handleSave}
+                disabled={phase !== 'ready'}
+                className="h-auto flex-col gap-1 py-3"
+              >
+                <ImageIcon className="size-5" />
+                <span className="text-xs font-semibold">Image</span>
+              </Button>
+
+              {isMonth && (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={handlePdf}
+                    disabled={building !== null}
+                    className="h-auto flex-col gap-1 py-3"
+                  >
+                    {building === 'pdf' ? (
+                      <LoaderIcon className="size-5 animate-spin" />
+                    ) : (
+                      <FileTextIcon className="size-5" />
+                    )}
+                    <span className="text-xs font-semibold">PDF</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleCsv}
+                    disabled={building !== null}
+                    className="h-auto flex-col gap-1 py-3"
+                  >
+                    <FileSpreadsheetIcon className="size-5" />
+                    <span className="text-xs font-semibold">Excel</span>
+                  </Button>
+                </>
+              )}
+            </div>
+
+            {isMonth && (
+              <p className="px-1 text-center text-xs text-muted-foreground">
+                PDF keeps every day on numbered pages. Excel opens the spreadsheet (.csv).
+              </p>
+            )}
+            {!nativeShare && !isMonth && (
               <p className="px-1 text-center text-xs text-muted-foreground">
                 Save the image, then attach it in WhatsApp.
               </p>
