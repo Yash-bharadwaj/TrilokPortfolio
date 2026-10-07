@@ -30,7 +30,8 @@ import {
   useWeekdayPattern,
 } from '@/hooks/useMetrics'
 import { useReportSheet } from '@/hooks/useReport'
-import { formatMonthLabel } from '@/lib/date'
+import { currentMonthKey, formatMonthLabel } from '@/lib/date'
+import { cn } from '@/lib/utils'
 
 // Recharts and the image generator are the two heavy dependencies here, and
 // neither is needed to paint the numbers the manager opens the app for.
@@ -79,121 +80,132 @@ export function DashboardPage() {
   const hasTarget = settings.monthlyTarget > 0
   const firstRun = !hasTarget && entries.length === 0
 
-  if (loading) {
-    return (
-      <div className="space-y-4 pt-2">
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-52 w-full rounded-xl" />
-        <Skeleton className="h-40 w-full rounded-xl" />
-        <Skeleton className="h-24 w-full rounded-xl" />
-      </div>
-    )
-  }
+  /*
+   * The month selector is rendered once, outside all of this, so it is never
+   * taken away. Landing on a month with no target used to replace the whole
+   * screen with the setup card, leaving no way back to a month that had data.
+   */
+  const body = (() => {
+    if (loading) {
+      return (
+        <>
+          <Skeleton className="h-52 w-full rounded-xl" />
+          <Skeleton className="h-40 w-full rounded-xl" />
+          <Skeleton className="h-24 w-full rounded-xl" />
+        </>
+      )
+    }
 
-  if (error) {
-    return (
-      <Card className="mt-4 p-5 text-center">
-        <p className="text-sm font-medium text-destructive">{error}</p>
-        <Button className="mt-3" onClick={() => window.location.reload()}>
-          Try again
-        </Button>
-      </Card>
-    )
-  }
+    if (error) {
+      return (
+        <Card className="p-5 text-center">
+          <p className="text-sm font-medium text-destructive">{error}</p>
+          <Button className="mt-3" onClick={() => window.location.reload()}>
+            Try again
+          </Button>
+        </Card>
+      )
+    }
 
-  // Offline with nothing from the server: say so rather than totalling up only
-  // the entries that happen to be queued on this device.
-  if (!isOnline && !hasServerData) {
-    return (
-      <div className="space-y-4 pt-1">
-        <MonthSelector />
-        <OfflineNotice pendingWrites={pendingWrites} />
-      </div>
-    )
-  }
+    // Offline with nothing from the server: say so rather than totalling up only
+    // the entries that happen to be queued on this device.
+    if (!isOnline && !hasServerData) {
+      return <OfflineNotice pendingWrites={pendingWrites} />
+    }
 
-  if (firstRun) {
-    return (
-      <div className="mx-auto mt-6 max-w-sm">
-        <Card className="p-6 text-center">
-          <BrundavanEmblem className="mx-auto h-14 w-auto" />
-          <h1 className="mt-3 text-lg font-bold">Welcome</h1>
+    if (firstRun) {
+      const isThisMonth = monthKey === currentMonthKey()
+      return (
+        <Card className="mx-auto max-w-sm p-6 text-center">
+          {isThisMonth && <BrundavanEmblem className="mx-auto h-14 w-auto" />}
+          <h1 className={cn('text-lg font-bold', isThisMonth && 'mt-3')}>
+            {isThisMonth ? 'Welcome' : `Nothing recorded in ${formatMonthLabel(monthKey)}`}
+          </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Start by setting the sales target for {formatMonthLabel(monthKey)}.
+            {isThisMonth
+              ? `Start by setting the sales target for ${formatMonthLabel(monthKey)}.`
+              : 'Set a target for this month, or use the arrows above to go back.'}
           </p>
           <div className="mt-5 text-left">
-            <TargetForm monthKey={monthKey} submitLabel="Continue" />
+            <TargetForm
+              monthKey={monthKey}
+              submitLabel={isThisMonth ? 'Continue' : 'Save target'}
+            />
           </div>
         </Card>
-      </div>
+      )
+    }
+
+    return (
+      <>
+        <MonthSummaryCard monthly={monthly} comparison={comparison} />
+
+        <TodayCard daily={daily} hasTarget={hasTarget} />
+
+        {/* The two actions this app exists for, side by side and always reachable. */}
+        <div className="grid grid-cols-2 gap-2.5">
+          <Button
+            variant="outline"
+            onClick={() => reportDate && report.show('daily', reportDate)}
+            disabled={!reportDate}
+          >
+            <Share2Icon className="size-4" />
+            Share day
+          </Button>
+          <Button onClick={() => report.show('mtd', monthly.asOf)} disabled={entries.length === 0}>
+            <CalendarRangeIcon className="size-4" />
+            Share month
+          </Button>
+        </div>
+
+        {entries.length === 0 ? (
+          <EmptyState
+            icon={PlusIcon}
+            title={`No sales recorded in ${formatMonthLabel(monthKey)}`}
+            description="Add a day to see totals, charts and reports."
+            action={
+              <Button asChild className="mt-1">
+                <Link to="/add">Add sales</Link>
+              </Button>
+            }
+          />
+        ) : (
+          <>
+            <MissingDaysCard missing={missingDays} />
+            <PerformanceCard status={monthly.status} />
+            <KeyNumbers monthly={monthly} />
+            <DailyTable monthly={monthly} />
+            <React.Suspense fallback={<Skeleton className="h-72 w-full rounded-xl" />}>
+              <TrendChart monthly={monthly} />
+            </React.Suspense>
+            <WeekdayCard pattern={weekdayPattern} />
+            <ChannelCard channels={monthly.channels} title="Where sales came from this month" />
+            <FoodCard food={monthly.food} />
+            <InsightsCard insights={insights} />
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent days</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <Button asChild variant="outline" className="w-full">
+                  <Link to="/history">
+                    View all {entries.length} {entries.length === 1 ? 'day' : 'days'}
+                    <ArrowRightIcon className="size-4" />
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </>
+        )}
+      </>
     )
-  }
+  })()
 
   return (
     <div className="space-y-4 pt-1">
       <MonthSelector />
-
-      <MonthSummaryCard monthly={monthly} comparison={comparison} />
-
-      <TodayCard daily={daily} hasTarget={hasTarget} />
-
-      {/* The two actions this app exists for, side by side and always reachable. */}
-      <div className="grid grid-cols-2 gap-2.5">
-        <Button
-          variant="outline"
-          onClick={() => reportDate && report.show('daily', reportDate)}
-          disabled={!reportDate}
-        >
-          <Share2Icon className="size-4" />
-          Share day
-        </Button>
-        <Button onClick={() => report.show('mtd', monthly.asOf)} disabled={entries.length === 0}>
-          <CalendarRangeIcon className="size-4" />
-          Share month
-        </Button>
-      </div>
-
-      {entries.length === 0 ? (
-        <EmptyState
-          icon={PlusIcon}
-          title={`No sales recorded in ${formatMonthLabel(monthKey)}`}
-          description="Add a day to see totals, charts and reports."
-          action={
-            <Button asChild className="mt-1">
-              <Link to="/add">Add sales</Link>
-            </Button>
-          }
-        />
-      ) : (
-        <>
-          <MissingDaysCard missing={missingDays} />
-          <PerformanceCard status={monthly.status} />
-          <KeyNumbers monthly={monthly} />
-          <DailyTable monthly={monthly} />
-          <React.Suspense fallback={<Skeleton className="h-72 w-full rounded-xl" />}>
-            <TrendChart monthly={monthly} />
-          </React.Suspense>
-          <WeekdayCard pattern={weekdayPattern} />
-          <ChannelCard channels={monthly.channels} title="Where sales came from this month" />
-          <FoodCard food={monthly.food} />
-          <InsightsCard insights={insights} />
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent days</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <Button asChild variant="outline" className="w-full">
-                <Link to="/history">
-                  View all {entries.length} {entries.length === 1 ? 'day' : 'days'}
-                  <ArrowRightIcon className="size-4" />
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </>
-      )}
-
+      {body}
       <React.Suspense fallback={null}>
         <ReportSheet data={report.data} open={report.open} onOpenChange={report.setOpen} />
       </React.Suspense>
