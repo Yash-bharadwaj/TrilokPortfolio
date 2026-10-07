@@ -67,6 +67,16 @@ export function formatSignedPercent(value: number | null | undefined, digits = 1
   return `${sign}${Math.abs(value).toFixed(digits)}%`
 }
 
+/**
+ * `405%` / `14%` / `7.1%` — drops decimals once the number is big enough that
+ * they add length without adding meaning. For tight rows and chips.
+ */
+export function formatCompactPercent(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return '—'
+  const abs = Math.abs(value)
+  return `${value < 0 ? '−' : ''}${abs.toFixed(abs >= 10 ? 0 : 1)}%`
+}
+
 /** `2.4L` / `₹52.3K` — for chart axes, where full numbers never fit on a phone. */
 export function formatCompactCurrency(value: number): string {
   const abs = Math.abs(value)

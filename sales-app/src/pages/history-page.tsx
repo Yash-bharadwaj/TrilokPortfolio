@@ -1,6 +1,13 @@
 import * as React from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarDaysIcon, ChevronRightIcon, PlusIcon, Share2Icon } from 'lucide-react'
+import {
+  ArrowDownRightIcon,
+  ArrowUpRightIcon,
+  CalendarDaysIcon,
+  ChevronRightIcon,
+  PlusIcon,
+  Share2Icon,
+} from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -10,7 +17,7 @@ import { useSales } from '@/providers/sales-provider'
 import { useReportSheet } from '@/hooks/useReport'
 import { useMonthlyMetrics } from '@/hooks/useMetrics'
 import { totalSalesOf } from '@/calculations/config'
-import { formatCurrency, formatSignedCurrencyWithPercent } from '@/lib/format'
+import { formatCompactPercent, formatCurrency } from '@/lib/format'
 import { formatDayLabel, formatMonthLabel } from '@/lib/date'
 import { cn } from '@/lib/utils'
 
@@ -61,29 +68,52 @@ export function HistoryPage() {
             {rows.map((entry) => {
               const total = totalSalesOf(entry)
               const variance = total - target
+              const ahead = variance >= 0
+              // The arrow carries the direction, so the percentage is shown unsigned.
+              const sharePct = target > 0 ? Math.abs((variance / target) * 100) : null
               return (
                 <div key={entry.date} className="flex items-stretch">
                   <Link
                     to={`/add?date=${entry.date}`}
-                    className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3.5 transition-colors hover:bg-secondary/60"
+                    className="flex min-w-0 flex-1 items-center gap-2.5 py-3 pr-1 pl-4 transition-colors hover:bg-secondary/60"
                   >
+                    {/* Date and its takings sit on one line; the comparison goes
+                        beneath, kept to a single short line so a big rupee
+                        figure can never push the row to three lines. */}
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold">{formatDayLabel(entry.date)}</p>
+                      <div className="flex items-baseline justify-between gap-2">
+                        <p className="truncate text-sm font-semibold">
+                          {formatDayLabel(entry.date)}
+                        </p>
+                        <p className="tnum shrink-0 text-base font-bold">{formatCurrency(total)}</p>
+                      </div>
                       {hasTarget && (
                         <p
                           className={cn(
-                            'tnum text-xs font-medium',
-                            variance >= 0 ? 'text-leaf-600' : 'text-brand-600',
+                            'tnum mt-0.5 flex items-center gap-1 overflow-hidden text-[0.72rem] font-medium whitespace-nowrap',
+                            ahead ? 'text-leaf-600' : 'text-brand-600',
                           )}
                         >
-                          {formatSignedCurrencyWithPercent(variance, target)} vs target
+                          {ahead ? (
+                            <ArrowUpRightIcon className="size-3 shrink-0" aria-hidden />
+                          ) : (
+                            <ArrowDownRightIcon className="size-3 shrink-0" aria-hidden />
+                          )}
+                          <span className="truncate">
+                            {formatCurrency(Math.abs(variance))}
+                            <span className="ml-1 text-muted-foreground">
+                              ({formatCompactPercent(sharePct)})
+                            </span>
+                          </span>
+                          <span className="sr-only">
+                            {ahead ? 'above' : 'below'} the daily target
+                          </span>
                         </p>
                       )}
                       {entry.note && (
                         <p className="truncate text-xs text-muted-foreground">{entry.note}</p>
                       )}
                     </div>
-                    <p className="tnum shrink-0 text-base font-bold">{formatCurrency(total)}</p>
                     <ChevronRightIcon
                       className="size-4 shrink-0 text-muted-foreground"
                       aria-hidden
@@ -93,7 +123,7 @@ export function HistoryPage() {
                     type="button"
                     onClick={() => report.show('daily', entry.date)}
                     aria-label={`Share the report for ${formatDayLabel(entry.date)}`}
-                    className="flex w-14 shrink-0 items-center justify-center border-l border-border text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-primary"
+                    className="flex w-12 shrink-0 items-center justify-center border-l border-border text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-primary"
                   >
                     <Share2Icon className="size-4" aria-hidden />
                   </button>

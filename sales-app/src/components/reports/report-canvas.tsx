@@ -1,7 +1,12 @@
 import { forwardRef } from 'react'
 import { brundavanLogoSrc } from '@/components/brand'
 import { CHANNEL_COLORS, FOOD_COLORS } from '@/lib/chart-palette'
-import { formatCurrency, formatPercent, formatSignedCurrencyWithPercent } from '@/lib/format'
+import {
+  formatCurrency,
+  formatPercent,
+  formatSignedCurrency,
+  formatSignedPercent,
+} from '@/lib/format'
 import { formatLongDate, todayKey } from '@/lib/date'
 import { DIRECT_LABEL, HOTEL, REPORT_SIGNATURE } from '@/calculations/config'
 import { topInsights } from '@/calculations/insights'
@@ -41,28 +46,50 @@ function Rule() {
 function StatCell({
   label,
   value,
+  sub,
   color = '#1a1614',
 }: {
   label: string
   value: string
+  /** A small second line, for a figure that would crowd the main one. */
+  sub?: string
   color?: string
 }) {
+  // Long rupee figures would otherwise run past the column at the full size.
+  const size = value.length > 12 ? 30 : value.length > 10 ? 34 : 38
   return (
     <div style={{ flex: 1, minWidth: 0 }}>
       <p style={{ fontSize: 19, color: '#8d837c', margin: 0, fontWeight: 600 }}>{label}</p>
       <p
         style={{
-          fontSize: 38,
+          fontSize: size,
           fontWeight: 700,
           color,
           margin: '6px 0 0',
           letterSpacing: -0.8,
           fontVariantNumeric: 'tabular-nums',
           whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'clip',
         }}
       >
         {value}
       </p>
+      {sub && (
+        <p
+          style={{
+            fontSize: 19,
+            fontWeight: 600,
+            color,
+            opacity: 0.7,
+            margin: '2px 0 0',
+            fontVariantNumeric: 'tabular-nums',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {sub}
+        </p>
+      )}
     </div>
   )
 }
@@ -269,7 +296,12 @@ export const ReportCanvas = forwardRef<HTMLDivElement, { data: ReportData }>(
                 />
                 <StatCell
                   label="vs Target"
-                  value={hasTarget ? formatSignedCurrencyWithPercent(daily.variance, daily.baseDailyTarget) : '—'}
+                  value={hasTarget ? formatSignedCurrency(daily.variance) : '—'}
+                  sub={
+                    hasTarget && daily.baseDailyTarget > 0
+                      ? formatSignedPercent((daily.variance / daily.baseDailyTarget) * 100)
+                      : undefined
+                  }
                   color={daily.variance >= 0 ? '#0d6b3d' : '#a4162e'}
                 />
               </>
