@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { todayKey } from '@/lib/date'
 import { formatCurrency } from '@/lib/format'
-import { SALES_MODEL } from '@/calculations/config'
+import { ENTRY_MODE, SALES_MODEL } from '@/calculations/config'
 
 const MAX_AMOUNT = 100_000_000 // ₹10 crore in a single day is a typo, not a sale.
 
@@ -61,10 +61,8 @@ export interface SoftWarning {
  * saving, because the hotel may legitimately record categories we cannot model.
  */
 export interface DayContext {
-  /** Total already recorded for earlier days of the same month. */
-  monthToDateBefore: number
-  /** How many earlier days of the month are recorded. */
-  priorDays: number
+  /** The running total standing at the end of the previous recorded day. */
+  previousCumulativeTotal: number
 }
 
 export function collectSoftWarnings(
@@ -128,24 +126,24 @@ export function collectSoftWarnings(
   }
 
   /*
-   * The hotel's handwritten sheet carries a running month-to-date column
-   * alongside the daily one, and it is easy to copy the wrong column. A single
-   * day that matches or beats everything recorded so far is the signature of
-   * that mistake, so it is worth questioning — but never blocking, because a
-   * festival day really can do it.
+   * A running total can only ever grow. A line below the one before it means a
+   * figure was mistyped, and would otherwise read as a day of zero sales.
    */
   if (
+    ENTRY_MODE === 'cumulative' &&
     context &&
-    context.priorDays >= 2 &&
-    context.monthToDateBefore > 0 &&
-    dayTotal >= context.monthToDateBefore * 0.95
+    context.previousCumulativeTotal > 0 &&
+    dayTotal > 0 &&
+    dayTotal < context.previousCumulativeTotal
   ) {
     warnings.push({
-      id: 'looks-cumulative',
+      id: 'below-previous',
       level: 'warning',
-      message: `${formatCurrency(dayTotal)} is as much as the whole month so far (${formatCurrency(
-        context.monthToDateBefore,
-      )}). If you are reading a running total, enter only this day's sales — the app adds up the month for you.`,
+      message: `The month already stood at ${formatCurrency(
+        context.previousCumulativeTotal,
+      )} up to the day before, so a running total cannot be ${formatCurrency(
+        dayTotal,
+      )}. Please check the figures.`,
     })
   }
 

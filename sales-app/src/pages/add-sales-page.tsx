@@ -25,7 +25,15 @@ import { DateField } from '@/components/dashboard/date-field'
 import { useSales } from '@/providers/sales-provider'
 import { collectSoftWarnings, dailySalesSchema, type DailySalesValues } from '@/schemas/sales'
 import { daysInMonthOf, formatLongDate, monthKeyOfDay, todayKey } from '@/lib/date'
-import { NET_HINT, NET_LABEL, totalSalesOf } from '@/calculations/config'
+import {
+  ENTRY_LABEL_SUFFIX,
+  ENTRY_MODE,
+  ENTRY_MODE_HINT,
+  NET_HINT,
+  NET_LABEL,
+  totalSalesOf,
+} from '@/calculations/config'
+import { cumulativeBefore } from '@/calculations/entry-mode'
 import { formatCurrency, formatSignedCurrencyWithPercent } from '@/lib/format'
 import { friendlyError } from '@/lib/errors'
 import { cn } from '@/lib/utils'
@@ -89,7 +97,7 @@ function MoneyField({
 export function AddSalesPage() {
   const [params] = useSearchParams()
   const navigate = useNavigate()
-  const { entryFor, saveDay, deleteDay, settings, loading, monthKey, setMonthKey, entries } =
+  const { rawEntryFor, saveDay, deleteDay, settings, loading, monthKey, setMonthKey, rawEntries } =
     useSales()
 
   const requested = params.get('date')
@@ -117,7 +125,7 @@ export function AddSalesPage() {
   }, [dateMonth, monthKey, setMonthKey])
 
   const ready = !loading && dateMonth === monthKey
-  const existing = ready ? entryFor(date) : null
+  const existing = ready ? rawEntryFor(date) : null
   const hydratedFor = React.useRef<string | null>(null)
 
   /*
@@ -131,7 +139,8 @@ export function AddSalesPage() {
   React.useEffect(() => {
     if (!ready || hydratedFor.current === date) return
     hydratedFor.current = date
-    const entry = entryFor(date)
+    // Loaded exactly as typed, so a running total is edited as a running total.
+    const entry = rawEntryFor(date)
     reset({
       date,
       netSales: entry ? entry.netSales : null,
@@ -142,19 +151,18 @@ export function AddSalesPage() {
       expenses: entry ? entry.expenses : null,
       note: entry?.note ?? '',
     })
-  }, [ready, date, entryFor, reset])
+  }, [ready, date, rawEntryFor, reset])
 
   const values = watch()
 
-  // What the month already holds before this date, used to spot a running
-  // total being entered where a single day belongs.
-  const dayContext = React.useMemo(() => {
-    const prior = entries.filter((e) => e.date < date && monthKeyOfDay(e.date) === dateMonth)
-    return {
-      monthToDateBefore: prior.reduce((sum, e) => sum + totalSalesOf(e), 0),
-      priorDays: prior.length,
-    }
-  }, [entries, date, dateMonth])
+  // The running total standing immediately before this date. Everything typed
+  // on this screen builds on it.
+  const before = React.useMemo(() => cumulativeBefore(rawEntries, date), [rawEntries, date])
+
+  const dayContext = React.useMemo(
+    () => ({ previousCumulativeTotal: totalSalesOf(before) }),
+    [before],
+  )
 
   const warnings = React.useMemo(
     () => collectSoftWarnings(values, dayContext),
@@ -165,11 +173,18 @@ export function AddSalesPage() {
   // number of days in that month — it is never entered by hand.
   // The figure that is actually credited against the target, recalculated on
   // every keystroke so the manager never has to add it up.
-  const dayTotal = totalSalesOf({
+  const enteredTotal = totalSalesOf({
     netSales: values.netSales ?? 0,
     swiggySales: values.swiggySales ?? 0,
     zomatoSales: values.zomatoSales ?? 0,
   })
+
+  // In cumulative mode the figure credited to this day is what was typed minus
+  // the line before it.
+  const dayTotal =
+    ENTRY_MODE === 'cumulative'
+      ? Math.max(0, enteredTotal - dayContext.previousCumulativeTotal)
+      : enteredTotal
 
   const dailyTarget =
     settings.monthlyTarget > 0 && dateMonth === settings.monthKey
@@ -211,7 +226,9 @@ export function AddSalesPage() {
       <div>
         <h1 className="text-xl font-bold">{existing ? 'Edit sales' : 'Add daily sales'}</h1>
         <p className="mt-0.5 text-sm text-muted-foreground">
-          Only the day's total is required. Everything else is optional.
+          {ENTRY_MODE === 'cumulative'
+            ? 'Enter the running totals from the sheet. Only the restaurant figure is required.'
+            : "Only the day's total is required. Everything else is optional."}
         </p>
       </div>
 
@@ -250,9 +267,9 @@ export function AddSalesPage() {
           )}
 
           <MoneyField
-            label={NET_LABEL}
+            label={`${NET_LABEL}${ENTRY_LABEL_SUFFIX}`}
             htmlFor="netSales"
-            hint={NET_HINT}
+            hint={ENTRY_MODE === 'cumulative' ? ENTRY_MODE_HINT : NET_HINT}
             error={errors.netSales?.message}
           >
             <Controller
@@ -273,9 +290,11 @@ export function AddSalesPage() {
         </Card>
 
         <Card className="space-y-4 p-4">
-          <p className="text-sm font-semibold">Online orders</p>
+          <p className="text-sm font-semibold">Online orders{ENTRY_LABEL_SUFFIX}</p>
           <p className="-mt-2 text-xs text-muted-foreground">
-            Added on top of restaurant sales. Leave blank if there were none.
+            {ENTRY_MODE === 'cumulative'
+              ? 'Running totals for the month, as written on the sheet.'
+              : 'Added on top of restaurant sales. Leave blank if there were none.'}
           </p>
           <MoneyField label="Swiggy" htmlFor="swiggySales" optional error={errors.swiggySales?.message}>
             <Controller
@@ -301,10 +320,14 @@ export function AddSalesPage() {
           <div className="flex items-baseline justify-between gap-3">
             <div className="min-w-0">
               <p className="text-xs font-semibold tracking-wide text-brand-700 uppercase">
-                Day total
+                This day's sales
               </p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Restaurant + Swiggy + Zomato
+                {ENTRY_MODE === 'cumulative' && dayContext.previousCumulativeTotal > 0
+                  ? `${formatCurrency(enteredTotal)} entered − ${formatCurrency(
+                      dayContext.previousCumulativeTotal,
+                    )} up to the day before`
+                  : 'Restaurant + Swiggy + Zomato'}
               </p>
             </div>
             <p className="tnum shrink-0 text-2xl font-extrabold" aria-live="polite">
@@ -326,7 +349,12 @@ export function AddSalesPage() {
         </Card>
 
         <Card className="space-y-4 p-4">
-          <p className="text-sm font-semibold">Food split &amp; expenses</p>
+          <p className="text-sm font-semibold">Food split &amp; expenses{ENTRY_LABEL_SUFFIX}</p>
+          {ENTRY_MODE === 'cumulative' && (
+            <p className="-mt-2 text-xs text-muted-foreground">
+              Running totals for the month, same as above.
+            </p>
+          )}
           <MoneyField label="Veg sales" htmlFor="vegSales" optional error={errors.vegSales?.message}>
             <Controller
               control={control}

@@ -28,6 +28,25 @@ export type SalesModel = 'net-includes-online' | 'net-excludes-online'
 export const SALES_MODEL: SalesModel = 'net-excludes-online'
 
 /**
+ * HOW THE HOTEL WRITES ITS NUMBERS.
+ * ---------------------------------------------------------------------------
+ * The handwritten sheet is kept as a running month-to-date total: each line is
+ * everything up to and including that day, not that day on its own. The hotel
+ * enters it the same way, so the app accepts it the same way.
+ *
+ * What is stored is exactly what was typed. Daily figures are derived on read
+ * by subtracting each line from the one before. Keeping the typed figure as the
+ * source of truth is what makes a late correction safe: fill in a day that was
+ * missed, and every day after it re-derives correctly. Converting to daily at
+ * save time could not do that, because the original line would be gone.
+ *
+ * Switch to 'daily' and entries are taken as that day's takings instead.
+ */
+export type EntryMode = 'cumulative' | 'daily'
+
+export const ENTRY_MODE: EntryMode = 'cumulative'
+
+/**
  * Wording that follows the model. A lookup rather than comparisons, because at
  * module scope TypeScript narrows the constant to its own literal.
  */
@@ -55,6 +74,25 @@ export const DIRECT_LABEL: string = MODEL_TEXT[SALES_MODEL].direct
 /** Label and hint for the required amount on the entry form. */
 export const NET_LABEL: string = MODEL_TEXT[SALES_MODEL].net
 export const NET_HINT: string = MODEL_TEXT[SALES_MODEL].netHint
+
+/** Wording for the entry form, which depends on how the hotel writes its sheet. */
+const ENTRY_TEXT = {
+  cumulative: {
+    note: 'Figures are entered as a running total for the month, exactly as the sheet is kept. Each day is worked out by subtracting the line before.',
+    suffix: ' so far this month',
+    hint: 'Running total for the month, as written on the sheet — not just today.',
+  },
+  daily: {
+    note: 'Figures are entered as that day on its own. The app adds up the month.',
+    suffix: '',
+    hint: '',
+  },
+} as const satisfies Record<EntryMode, { note: string; suffix: string; hint: string }>
+
+export const ENTRY_MODE_NOTE: string = ENTRY_TEXT[ENTRY_MODE].note
+/** Appended to every money label on the form, e.g. "Restaurant sales so far this month". */
+export const ENTRY_LABEL_SUFFIX: string = ENTRY_TEXT[ENTRY_MODE].suffix
+export const ENTRY_MODE_HINT: string = ENTRY_TEXT[ENTRY_MODE].hint
 
 /** Day total credited against the target. */
 export function totalSalesOf(entry: {

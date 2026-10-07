@@ -286,6 +286,7 @@ import { generateInsights } from '../insights'
 import type { Insight } from '@/types'
 import { buildMonthCsv } from '@/lib/csv'
 import { collectSoftWarnings } from '@/schemas/sales'
+import { cumulativeBefore, toDailyEntries } from '../entry-mode'
 
 describe('missing days', () => {
   it('lists elapsed days of the month with no record', () => {
@@ -421,28 +422,94 @@ describe('insight scope', () => {
 })
 
 describe('running-total safeguard', () => {
-  const entry = { netSales: 50000, swiggySales: 5000, zomatoSales: 5000, vegSales: null, nonVegSales: null, expenses: null }
+  const entry = {
+    netSales: 50000,
+    swiggySales: 5000,
+    zomatoSales: 5000,
+    vegSales: null,
+    nonVegSales: null,
+    expenses: null,
+  }
 
-  it('questions a day that matches the whole month so far', () => {
-    const w = collectSoftWarnings(entry, { monthToDateBefore: 60000, priorDays: 4 })
-    const hit = w.find((x) => x.id === 'looks-cumulative')
+  it('questions a running total that goes down', () => {
+    const w = collectSoftWarnings(entry, { previousCumulativeTotal: 200000 })
+    const hit = w.find((x) => x.id === 'below-previous')
     expect(hit).toBeDefined()
-    expect(hit!.level).toBe('warning')
-    expect(hit!.message).toMatch(/running total/i)
+    expect(hit!.message).toMatch(/cannot be/i)
   })
 
-  it('stays quiet on an ordinary day', () => {
-    const w = collectSoftWarnings(entry, { monthToDateBefore: 400000, priorDays: 6 })
-    expect(w.find((x) => x.id === 'looks-cumulative')).toBeUndefined()
+  it('stays quiet when the total grows', () => {
+    const w = collectSoftWarnings(entry, { previousCumulativeTotal: 40000 })
+    expect(w.find((x) => x.id === 'below-previous')).toBeUndefined()
   })
 
-  it('stays quiet too early in the month to judge', () => {
-    const w = collectSoftWarnings(entry, { monthToDateBefore: 40000, priorDays: 1 })
-    expect(w.find((x) => x.id === 'looks-cumulative')).toBeUndefined()
+  it('stays quiet on the first day of the month', () => {
+    const w = collectSoftWarnings(entry, { previousCumulativeTotal: 0 })
+    expect(w.find((x) => x.id === 'below-previous')).toBeUndefined()
   })
 
   it('never blocks saving', () => {
-    const w = collectSoftWarnings(entry, { monthToDateBefore: 60000, priorDays: 4 })
+    const w = collectSoftWarnings(entry, { previousCumulativeTotal: 200000 })
     expect(w.every((x) => x.level === 'warning' || x.level === 'info')).toBe(true)
+  })
+})
+
+describe('cumulative entries become daily figures', () => {
+  const cumulative = [
+    day('2026-10-01', 38456, 7922, 5204, { expenses: 11575 }),
+    day('2026-10-02', 92141, 11616, 10707, { expenses: 26644 }),
+    day('2026-10-03', 147951, 15234, 17155, { expenses: 37917 }),
+    day('2026-10-04', 189817, 23019, 26751, { expenses: 48679 }),
+    day('2026-10-05', 241648, 28345, 33127, { expenses: 64116 }),
+  ]
+
+  it('differences each line from the one before', () => {
+    const daily = toDailyEntries(cumulative)
+    expect(daily.map((d) => d.netSales)).toEqual([38456, 53685, 55810, 41866, 51831])
+    expect(daily.map((d) => d.swiggySales)).toEqual([7922, 3694, 3618, 7785, 5326])
+    expect(daily.map((d) => d.zomatoSales)).toEqual([5204, 5503, 6448, 9596, 6376])
+    expect(daily.map((d) => d.expenses)).toEqual([11575, 15069, 11273, 10762, 15437])
+  })
+
+  it('leaves the month total equal to the final line', () => {
+    const daily = toDailyEntries(cumulative)
+    const total = daily.reduce((s, e) => s + totalSalesOf(e), 0)
+    expect(total).toBe(totalSalesOf(cumulative[4]!))
+    expect(total).toBe(303120)
+  })
+
+  it('starts each month afresh rather than carrying one into the next', () => {
+    const daily = toDailyEntries([
+      day('2026-09-29', 500000, 0, 0),
+      day('2026-09-30', 560000, 0, 0),
+      day('2026-10-01', 40000, 0, 0),
+      day('2026-10-02', 95000, 0, 0),
+    ])
+    const byDate = Object.fromEntries(daily.map((d) => [d.date, d.netSales]))
+    expect(byDate['2026-09-30']).toBe(60000)
+    expect(byDate['2026-10-01']).toBe(40000) // not 40000 - 560000
+    expect(byDate['2026-10-02']).toBe(55000)
+  })
+
+  it('floors a mistyped line at zero rather than going negative', () => {
+    const daily = toDailyEntries([
+      day('2026-10-01', 100000, 0, 0),
+      day('2026-10-02', 40000, 0, 0),
+    ])
+    expect(daily[1]!.netSales).toBe(0)
+  })
+
+  it('self-heals when a missed day is filled in afterwards', () => {
+    const withGap = [day('2026-10-01', 40000, 0, 0), day('2026-10-03', 150000, 0, 0)]
+    expect(toDailyEntries(withGap).map((d) => d.netSales)).toEqual([40000, 110000])
+
+    // The manager later fills in 2 October; both later days re-derive correctly.
+    const filled = [...withGap, day('2026-10-02', 95000, 0, 0)]
+    expect(toDailyEntries(filled).map((d) => d.netSales)).toEqual([40000, 55000, 55000])
+  })
+
+  it('reports the running total standing before a date', () => {
+    expect(cumulativeBefore(cumulative, '2026-10-04').netSales).toBe(147951)
+    expect(cumulativeBefore(cumulative, '2026-10-01').netSales).toBe(0)
   })
 })

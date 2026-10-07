@@ -8,7 +8,7 @@ import { TargetForm } from '@/components/dashboard/target-form'
 import { BrundavanLogo } from '@/components/brand'
 import { useAuth } from '@/providers/auth-provider'
 import { useSales } from '@/providers/sales-provider'
-import { HOTEL, SALES_MODEL_NOTE } from '@/calculations/config'
+import { ENTRY_MODE_NOTE, HOTEL, SALES_MODEL_NOTE } from '@/calculations/config'
 import { useMonthlyMetrics } from '@/hooks/useMetrics'
 import { buildMonthCsv, downloadCsv, monthCsvFileName } from '@/lib/csv'
 import { RangeExport } from '@/components/dashboard/range-export'
@@ -100,7 +100,8 @@ export function SettingsPage() {
         <CardHeader>
           <CardTitle>How sales are counted</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-2.5">
+          <p className="text-sm text-muted-foreground">{ENTRY_MODE_NOTE}</p>
           <p className="text-sm text-muted-foreground">{SALES_MODEL_NOTE}</p>
         </CardContent>
       </Card>

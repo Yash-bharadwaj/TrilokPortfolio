@@ -40,6 +40,26 @@ This lives in exactly one place, [`src/calculations/config.ts`](./src/calculatio
 Flipping `SALES_MODEL` swaps the rule, the wording and the column headings
 together; nothing else changes.
 
+## How figures are entered
+
+The hotel keeps its sheet as a **running month-to-date total**: each line is
+everything up to and including that day. The app takes them the same way.
+
+**What is stored is exactly what was typed.** Daily figures are derived on read
+by subtracting each line from the one before
+([`calculations/entry-mode.ts`](./src/calculations/entry-mode.ts)), so the sheet
+stays the source of truth. That is what makes a late correction safe — fill in a
+day that was missed, and every day after it re-derives correctly. Converting to
+daily at save time could not do that, because the typed line would be gone.
+
+Totals reset each month, so months are differenced independently. A line lower
+than the one before cannot occur in a genuine running total, so the day is
+floored at zero and the entry form questions it.
+
+`ENTRY_MODE` in [`calculations/config.ts`](./src/calculations/config.ts) switches
+the whole app — the labels, the hint text, the derivation and the warning — to
+plain daily entry instead.
+
 ## The calculations
 
 All of it is in [`src/calculations/`](./src/calculations/), never inline in a

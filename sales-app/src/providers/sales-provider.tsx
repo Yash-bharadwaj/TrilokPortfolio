@@ -6,6 +6,7 @@ import { emptySettings } from '@/services/repository'
 import { flushOutbox, withOutbox } from '@/services/outboxRepository'
 import { listPending, OUTBOX_EVENT } from '@/services/outbox'
 import { monthsBetween, shiftMonth } from '@/lib/date'
+import { toDailyEntries } from '@/calculations/entry-mode'
 import { sortEntries } from '@/services/repository'
 import type { DailySales, MonthSettings } from '@/types'
 import { currentMonthKey, monthKeyOfDay } from '@/lib/date'
@@ -23,7 +24,12 @@ interface SalesState {
   error: string | null
   syncStatus: SyncStatus
   isOnline: boolean
+  /** One day's own takings, derived from what was entered. */
   entryFor: (date: string) => DailySales | null
+  /** The record exactly as entered — a running total when that is how it was typed. */
+  rawEntryFor: (date: string) => DailySales | null
+  /** Every record as entered, for the form's arithmetic. */
+  rawEntries: DailySales[]
   /** Previous month's totals, fetched once for the comparison. */
   previousMonth: MonthSnapshot | null
   /** One-off read of any day range, for exporting. Crosses months freely. */
@@ -151,10 +157,14 @@ export function SalesProvider({ children }: { children: React.ReactNode }) {
   // Kept referentially stable: returning a fresh `[]` on every render would
   // re-create every downstream callback and re-render the whole dashboard.
   const fresh = snapshot?.monthKey === monthKey
-  const entries = React.useMemo(
+  // As typed. The outbox has already overlaid anything not yet sent.
+  const rawEntries = React.useMemo(
     () => (fresh && snapshot ? snapshot.entries : EMPTY_ENTRIES),
     [fresh, snapshot],
   )
+
+  // What every calculation, chart and report works from: one day at a time.
+  const entries = React.useMemo(() => toDailyEntries(rawEntries), [rawEntries])
   const settings = React.useMemo(
     () => (fresh && snapshot ? snapshot.settings : emptySettings(monthKey)),
     [fresh, snapshot, monthKey],
@@ -176,7 +186,7 @@ export function SalesProvider({ children }: { children: React.ReactNode }) {
     void repository
       .getMonthSnapshot(shiftMonth(monthKey, -1))
       .then((snap) => {
-        if (!cancelled) setPreviousMonth(snap)
+        if (!cancelled) setPreviousMonth({ ...snap, entries: toDailyEntries(snap.entries) })
       })
       .catch(() => {
         if (!cancelled) setPreviousMonth(null)
@@ -191,13 +201,22 @@ export function SalesProvider({ children }: { children: React.ReactNode }) {
     [entries],
   )
 
+  const rawEntryFor = React.useCallback(
+    (date: string) => rawEntries.find((e) => e.date === date) ?? null,
+    [rawEntries],
+  )
+
   const fetchRange = React.useCallback(
     async (from: string, to: string) => {
       if (!repository) throw new Error('Still starting up. Please try again in a moment.')
       const months = monthsBetween(from, to)
       const snapshots = await Promise.all(months.map((m) => repository.getMonthSnapshot(m)))
+      // Difference inside each month first, then cut to the range, or days at a
+      // month boundary would lose the line they are measured against.
       const entries = sortEntries(
-        snapshots.flatMap((s) => s.entries).filter((e) => e.date >= from && e.date <= to),
+        toDailyEntries(snapshots.flatMap((s) => s.entries)).filter(
+          (e) => e.date >= from && e.date <= to,
+        ),
       )
       const monthlyTargets = Object.fromEntries(
         snapshots.map((s) => [s.monthKey, s.settings.monthlyTarget]),
@@ -245,6 +264,8 @@ export function SalesProvider({ children }: { children: React.ReactNode }) {
       syncStatus,
       isOnline,
       entryFor,
+      rawEntryFor,
+      rawEntries,
       previousMonth,
       pendingWrites,
       hasServerData,
@@ -264,6 +285,8 @@ export function SalesProvider({ children }: { children: React.ReactNode }) {
       syncStatus,
       isOnline,
       entryFor,
+      rawEntryFor,
+      rawEntries,
       previousMonth,
       pendingWrites,
       hasServerData,
