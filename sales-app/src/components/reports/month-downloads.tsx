@@ -126,35 +126,32 @@ export function MonthDownloads({
   }
 
   const actions = [
-    { id: 'image' as const, label: 'Image', icon: ImageIcon, onClick: handleImage },
-    { id: 'pdf' as const, label: 'PDF', icon: FileTextIcon, onClick: handlePdf },
-    { id: 'csv' as const, label: 'Excel', icon: FileSpreadsheetIcon, onClick: handleCsv },
+    { id: 'pdf' as const, label: 'Download PDF', icon: FileTextIcon, onClick: handlePdf },
+    { id: 'csv' as const, label: 'Download Excel', icon: FileSpreadsheetIcon, onClick: handleCsv },
+    { id: 'image' as const, label: 'Download Image', icon: ImageIcon, onClick: handleImage },
   ]
 
   return (
     <>
+      {/* One full-width button per row, so each reads as a single clear action
+          rather than three tiles to decode. */}
       <div className="space-y-2">
-        <p className="text-xs font-medium text-muted-foreground">Download {monthLabel}</p>
-        {/* One plain row. Icons sit beside the words, not above them, so each
-            control reads as a button rather than a tile. */}
-        <div className="flex gap-2">
-          {actions.map(({ id, label, icon: Icon, onClick }) => (
-            <Button
-              key={id}
-              variant="outline"
-              onClick={onClick}
-              disabled={disabled || job !== null}
-              className="flex-1 gap-1.5 px-2"
-            >
-              {job === id ? (
-                <LoaderIcon className="size-4 shrink-0 animate-spin" />
-              ) : (
-                <Icon className="size-4 shrink-0" />
-              )}
-              <span className="truncate text-xs font-semibold">{label}</span>
-            </Button>
-          ))}
-        </div>
+        {actions.map(({ id, label, icon: Icon, onClick }) => (
+          <Button
+            key={id}
+            size="lg"
+            onClick={onClick}
+            disabled={disabled || job !== null}
+            className="w-full justify-center gap-2"
+          >
+            {job === id ? (
+              <LoaderIcon className="size-5 shrink-0 animate-spin" />
+            ) : (
+              <Icon className="size-5 shrink-0" />
+            )}
+            {job === id ? 'Preparing…' : label}
+          </Button>
+        ))}
       </div>
 
       {pending && (
