@@ -41,12 +41,12 @@ export function TrendChart({ monthly }: { monthly: MonthlyMetrics }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Sales each day</CardTitle>
-        {hasTarget && (
-          <CardDescription>
-            Dotted line is the daily target of {formatCurrency(target)}
-          </CardDescription>
-        )}
+        <CardTitle>Month at a glance</CardTitle>
+        <CardDescription>
+          {hasTarget
+            ? `The same days as a picture. The dotted line is the daily target of ${formatCurrency(target)}.`
+            : 'The same days as a picture.'}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="h-52 w-full">

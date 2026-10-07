@@ -12,6 +12,7 @@ import { PerformanceCard } from '@/components/dashboard/performance-card'
 import { KeyNumbers } from '@/components/dashboard/key-numbers'
 import { ChannelCard, FoodCard } from '@/components/dashboard/breakdown-cards'
 import { InsightsCard } from '@/components/dashboard/insights-card'
+import { DailyTable } from '@/components/dashboard/daily-table'
 import { MissingDaysCard } from '@/components/dashboard/missing-days-card'
 import { OfflineNotice } from '@/components/dashboard/offline-notice'
 import { WeekdayCard } from '@/components/dashboard/weekday-card'
@@ -168,6 +169,7 @@ export function DashboardPage() {
           <MissingDaysCard missing={missingDays} />
           <PerformanceCard status={monthly.status} />
           <KeyNumbers monthly={monthly} />
+          <DailyTable monthly={monthly} />
           <React.Suspense fallback={<Skeleton className="h-72 w-full rounded-xl" />}>
             <TrendChart monthly={monthly} />
           </React.Suspense>
