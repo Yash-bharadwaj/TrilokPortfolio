@@ -29,7 +29,7 @@ import {
   useShareDate,
   useWeekdayPattern,
 } from '@/hooks/useMetrics'
-import { useReportSheet } from '@/hooks/useReport'
+import { useReportBuilder, useReportSheet } from '@/hooks/useReport'
 import { currentMonthKey, formatMonthLabel } from '@/lib/date'
 import { cn } from '@/lib/utils'
 
@@ -37,6 +37,9 @@ import { cn } from '@/lib/utils'
 // neither is needed to paint the numbers the manager opens the app for.
 const TrendChart = React.lazy(() =>
   import('@/components/dashboard/trend-chart').then((m) => ({ default: m.TrendChart })),
+)
+const MonthDownloads = React.lazy(() =>
+  import('@/components/reports/month-downloads').then((m) => ({ default: m.MonthDownloads })),
 )
 const ReportSheet = React.lazy(() =>
   import('@/components/reports/report-sheet').then((m) => ({ default: m.ReportSheet })),
@@ -51,6 +54,7 @@ export function DashboardPage() {
   const daily = useDailyMetrics(focusDate)
   const insights = useInsights(daily, monthly)
   const reportDate = useShareDate()
+  const buildReport = useReportBuilder()
   const missingDays = useMissingDays()
   const weekdayPattern = useWeekdayPattern()
   const comparison = useMonthComparison(monthly)
@@ -157,6 +161,18 @@ export function DashboardPage() {
             Share month
           </Button>
         </div>
+
+        {entries.length > 0 && (
+          <React.Suspense fallback={null}>
+            <MonthDownloads
+              build={() => buildReport('mtd', monthly.asOf)}
+              asOf={monthly.asOf}
+              monthLabel={monthly.monthLabel}
+              monthKey={monthKey}
+              disabled={false}
+            />
+          </React.Suspense>
+        )}
 
         {entries.length === 0 ? (
           <EmptyState
