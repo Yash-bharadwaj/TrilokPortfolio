@@ -1,3 +1,7 @@
+# NOTE: this site is deployed on Vercel, so this file has no effect.
+# The live configuration is vercel.json. Kept only in case the site is
+# ever moved to Netlify. Netlify is NOT the platform serving this site.
+
 [build]
   publish = "."
 
