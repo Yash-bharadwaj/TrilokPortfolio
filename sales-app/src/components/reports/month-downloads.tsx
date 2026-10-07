@@ -2,7 +2,6 @@ import * as React from 'react'
 import { FileSpreadsheetIcon, FileTextIcon, ImageIcon, LoaderIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { captureReport, downloadBlob, reportFileName } from '@/lib/report-image'
 import { buildMonthCsv, downloadCsv, monthCsvFileName } from '@/lib/csv'
 import { buildMonthPdf, monthPdfFileName } from '@/lib/report-pdf'
@@ -134,35 +133,29 @@ export function MonthDownloads({
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <CardTitle>Download {monthLabel}</CardTitle>
-          <CardDescription>
-            The whole month, every day included. PDF runs to numbered pages; Excel opens the
-            spreadsheet (.csv).
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-3 gap-2">
-            {actions.map(({ id, label, icon: Icon, onClick }) => (
-              <Button
-                key={id}
-                variant="outline"
-                onClick={onClick}
-                disabled={disabled || job !== null}
-                className="h-auto flex-col gap-1 py-3"
-              >
-                {job === id ? (
-                  <LoaderIcon className="size-5 animate-spin" />
-                ) : (
-                  <Icon className="size-5" />
-                )}
-                <span className="text-xs font-semibold">{label}</span>
-              </Button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-muted-foreground">Download {monthLabel}</p>
+        {/* One plain row. Icons sit beside the words, not above them, so each
+            control reads as a button rather than a tile. */}
+        <div className="flex gap-2">
+          {actions.map(({ id, label, icon: Icon, onClick }) => (
+            <Button
+              key={id}
+              variant="outline"
+              onClick={onClick}
+              disabled={disabled || job !== null}
+              className="flex-1 gap-1.5 px-2"
+            >
+              {job === id ? (
+                <LoaderIcon className="size-4 shrink-0 animate-spin" />
+              ) : (
+                <Icon className="size-4 shrink-0" />
+              )}
+              <span className="truncate text-xs font-semibold">{label}</span>
+            </Button>
+          ))}
+        </div>
+      </div>
 
       {pending && (
         <React.Suspense fallback={null}>

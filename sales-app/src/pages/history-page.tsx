@@ -14,13 +14,16 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
 import { MonthSelector } from '@/components/dashboard/month-selector'
 import { useSales } from '@/providers/sales-provider'
-import { useReportSheet } from '@/hooks/useReport'
+import { useReportBuilder, useReportSheet } from '@/hooks/useReport'
 import { useMonthlyMetrics } from '@/hooks/useMetrics'
 import { totalSalesOf } from '@/calculations/config'
 import { formatCompactPercent, formatCurrency } from '@/lib/format'
 import { formatDayLabel, formatMonthLabel } from '@/lib/date'
 import { cn } from '@/lib/utils'
 
+const MonthDownloads = React.lazy(() =>
+  import('@/components/reports/month-downloads').then((m) => ({ default: m.MonthDownloads })),
+)
 const ReportSheet = React.lazy(() =>
   import('@/components/reports/report-sheet').then((m) => ({ default: m.ReportSheet })),
 )
@@ -33,6 +36,7 @@ export function HistoryPage() {
   const { monthKey, entries, loading } = useSales()
   const monthly = useMonthlyMetrics()
   const report = useReportSheet()
+  const buildReport = useReportBuilder()
 
   const rows = React.useMemo(() => [...entries].reverse(), [entries])
   const target = monthly.baseDailyTarget
@@ -141,6 +145,16 @@ export function HistoryPage() {
             <Share2Icon className="size-4" />
             Share {formatMonthLabel(monthKey)} summary
           </Button>
+
+          <React.Suspense fallback={null}>
+            <MonthDownloads
+              build={() => buildReport('mtd', monthly.asOf)}
+              asOf={monthly.asOf}
+              monthLabel={formatMonthLabel(monthKey)}
+              monthKey={monthKey}
+              disabled={false}
+            />
+          </React.Suspense>
         </>
       )}
 
